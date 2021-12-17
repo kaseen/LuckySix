@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.6.6;
+pragma solidity ^0.8.0;
 
-import "@chainlink/contracts/src/v0.6/VRFConsumerBase.sol";
+import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 
 contract LuckySix is VRFConsumerBase {
-    // TODO: addresu ko igra mapira sa brojevima koje je igro i para kolko je uplatio
-    // TODO: solidity verzija 0.8
     // TODO: LuckySix is Ownable
 
     bytes32 internal keyHash;
@@ -15,43 +13,14 @@ contract LuckySix is VRFConsumerBase {
 
     uint256[] internal _allNumbers;
     uint256[] public _drawnNumbers;
-    uint256[] public xBonus = [
-        1,
-        1,
-        1,
-        1,
-        1,
-        10000,
-        7500,
-        5000,
-        2500,
-        1000,
-        500,
-        300,
-        200,
-        150,
-        100,
-        90,
-        80,
-        70,
-        60,
-        50,
-        40,
-        30,
-        25,
-        20,
-        15,
-        10,
-        9,
-        8,
-        7,
-        6,
-        5,
-        4,
-        3,
-        2,
-        1
-    ];
+    uint256[] public xBonus = [0, 0, 0, 0, 0, 10000, 7500, 5000, 2500, 1000, 500, 300, 200, 150, 100, 90, 80, 70, 60, 50, 40, 30, 25, 20, 15, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
+
+    mapping(address => Ticket[]) players;
+
+    struct Ticket{
+        uint256[6] combination;
+        uint256 price;
+    }
 
     constructor(
         address _vrfCoordinator,
@@ -64,10 +33,7 @@ contract LuckySix is VRFConsumerBase {
     }
 
     function getRandomNumber() public returns (bytes32 requestId) {
-        require(
-            LINK.balanceOf(address(this)) >= fee,
-            "Not enough LINK - fill contract with faucet"
-        );
+        require(LINK.balanceOf(address(this)) >= fee, "Not enough LINK - fill contract with faucet");
         return requestRandomness(keyHash, fee);
     }
 
@@ -77,6 +43,14 @@ contract LuckySix is VRFConsumerBase {
     {
         // TODO: require(randomness > 0, "random-not-found");
         _randomResult = randomness;
+    }
+
+    function enterLottery(uint256[6] memory _combination, uint256 _price) public payable{
+        players[msg.sender].push(Ticket({combination: _combination, price: _price}));
+    }
+
+    function getTickets(address player) public view returns(Ticket[] memory){
+        return players[player];
     }
 
     function drawNumbers() public {
@@ -141,7 +115,8 @@ contract LuckySix is VRFConsumerBase {
     }
 
     function get48() internal pure returns (uint256[48] memory numbers) {
-        for (uint256 i = 0; i < 48; i++) numbers[i] = i + 1;
+        for (uint256 i = 0; i < 48; i++)
+            numbers[i] = i + 1;
         return numbers;
     }
 

@@ -11,7 +11,7 @@ def allUnique(list):
 def test_drawn_numbers():
     # Arrange
     if network.show_active() not in LOCAL_BLOCKCHAIN_ENVIRONMENTS:
-        pytest.skip("Only for local testing")
+        pytest.skip("Only for local testing!")
     account = get_account()
     luckysix = deploy_and_fund()
     # Act
@@ -20,3 +20,14 @@ def test_drawn_numbers():
     # Assert
     assert len(drawnNumbers) == 35
     assert allUnique(drawnNumbers)
+
+def test_enter_lottery():
+    # Arrange
+    if network.show_active() not in LOCAL_BLOCKCHAIN_ENVIRONMENTS:
+        pytest.skip("Only for local testing!")
+    account = get_account()
+    luckysix = deploy_and_fund()
+    # Act
+    luckysix.enterLottery([1,2,3,4,5,6], 100)
+    # Assert
+    assert(len(luckysix.getTickets(account.address)) == 1)
