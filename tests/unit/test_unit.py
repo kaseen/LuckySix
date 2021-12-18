@@ -3,7 +3,7 @@ from scripts.deploy_and_fund import deploy_and_fund
 from scripts.helpful_scripts import LOCAL_BLOCKCHAIN_ENVIRONMENTS, get_account
 import pytest
 
-from tests.conftest import test_combination, test_price
+from tests.conftest import test_combination, test_price, player1, player2, player3
 
 
 def allUnique(list):
@@ -65,3 +65,22 @@ def test_cash_earned(test_combination, test_price):
         assert(cash == 0)
     else:
         assert(cash > 0)
+
+
+def test_lottery_multiple_users(player1, player2, player3):
+    # Arrange
+    if network.show_active() not in LOCAL_BLOCKCHAIN_ENVIRONMENTS:
+        pytest.skip("Only for local testing!")
+    owner = get_account()
+    pl1 = get_account(index=1)
+    pl2 = get_account(index=2)
+    pl3 = get_account(index=3)
+    luckysix = deploy_and_fund()
+    # Act
+    luckysix.drawNumbers({"from": owner})
+    luckysix.enterLottery(player1[0], player1[1],  {"from": pl1})
+    luckysix.enterLottery(player2[0], player2[1],  {"from": pl2})
+    luckysix.enterLottery(player3[0], player3[1],  {"from": pl3})
+    print(luckysix.cashEarned(pl1.address))
+    print(luckysix.cashEarned(pl2.address))
+    print(luckysix.cashEarned(pl3.address))

@@ -19,7 +19,7 @@ contract LuckySix is VRFConsumerBase {
 
     struct Ticket{
         uint256[6] combination;
-        uint256 price;
+        uint256 bet;
     }
 
     constructor(
@@ -48,19 +48,11 @@ contract LuckySix is VRFConsumerBase {
         _randomResult = randomness;
     }
 
-    function enterLottery(uint256[6] memory _combination, uint256 _price)
+    function enterLottery(uint256[6] memory _combination, uint256 _bet)
         public
         payable
     {
-        players[msg.sender].push(Ticket({combination: _combination, price: _price}));
-    }
-
-    function getTickets(address player)
-        public
-        view
-        returns(Ticket[] memory)
-    {
-        return players[player];
+        players[msg.sender].push(Ticket({combination: _combination, bet: _bet}));
     }
 
     function drawNumbers() public {
@@ -93,17 +85,18 @@ contract LuckySix is VRFConsumerBase {
         view
         returns(uint256)
     {
-        uint256 n = getMapLength(player);
+        // How many tickets players bought
+        uint256 n = players[player].length;
         uint256 sum = 0;
         int256 x;
         for(uint i=0; i<n; i++){
             x = returnIndexOfLastDrawnNumber(players[player][i].combination);
+            // If Ticket[i] won lottery, he gained xBonus[i] * Ticket[i].bet
             if(x != -1)
-                sum += xBonus[uint(x)] * players[player][i].price;
+                sum += xBonus[uint(x)] * players[player][i].bet;
         }
         return sum;
     }
-
 
     function removeByIndex(uint256 index, uint256[] memory array)
         internal
@@ -141,12 +134,12 @@ contract LuckySix is VRFConsumerBase {
         return (counter == 6 ? index : -1);
     }
 
-    function getMapLength(address player)
+    function getTickets(address player)
         public
         view
-        returns (uint256)
+        returns(Ticket[] memory)
     {
-        return players[player].length;
+        return players[player];
     }
 
     function get48()
