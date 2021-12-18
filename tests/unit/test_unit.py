@@ -45,6 +45,23 @@ def test_index_of_last_drawn_number(test_combination, test_price):
     luckysix = test_enter_lottery(test_combination, test_price)
     # Act
     luckysix.drawNumbers({"from": account})
-    x = luckysix.returnIndexOfLastDrawnNumber(test_combination)
-    print(luckysix.getDrawnNumbers())
-    print(x)
+    index = luckysix.returnIndexOfLastDrawnNumber(test_combination)
+    # Assert
+    assert(index >= -1);
+    assert(index <= 48);
+    return luckysix, index
+
+
+def test_cash_earned(test_combination, test_price):
+    # Arrange
+    if network.show_active() not in LOCAL_BLOCKCHAIN_ENVIRONMENTS:
+        pytest.skip("Only for local testing!")
+    account = get_account()
+    luckysix, index = test_index_of_last_drawn_number(test_combination, test_price)
+    # Act
+    cash = luckysix.cashEarned(account.address);
+    # Assert
+    if(index == -1):
+        assert(cash == 0)
+    else:
+        assert(cash > 0)

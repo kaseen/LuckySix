@@ -15,7 +15,7 @@ contract LuckySix is VRFConsumerBase {
     uint256[] public _drawnNumbers;
     uint256[] public xBonus = [0, 0, 0, 0, 0, 10000, 7500, 5000, 2500, 1000, 500, 300, 200, 150, 100, 90, 80, 70, 60, 50, 40, 30, 25, 20, 15, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
 
-    mapping(address => Ticket[]) players;
+    mapping(address => Ticket[]) public players;
 
     struct Ticket{
         uint256[6] combination;
@@ -27,12 +27,15 @@ contract LuckySix is VRFConsumerBase {
         address _link,
         bytes32 _keyhash,
         uint256 _fee
-    ) public VRFConsumerBase(_vrfCoordinator, _link) {
+    ) VRFConsumerBase(_vrfCoordinator, _link) {
         keyHash = _keyhash;
         fee = _fee;
     }
 
-    function getRandomNumber() public returns (bytes32 requestId) {
+    function getRandomNumber()
+        public
+        returns (bytes32 requestId)
+    {
         require(LINK.balanceOf(address(this)) >= fee, "Not enough LINK - fill contract with faucet");
         return requestRandomness(keyHash, fee);
     }
@@ -45,11 +48,18 @@ contract LuckySix is VRFConsumerBase {
         _randomResult = randomness;
     }
 
-    function enterLottery(uint256[6] memory _combination, uint256 _price) public payable{
+    function enterLottery(uint256[6] memory _combination, uint256 _price)
+        public
+        payable
+    {
         players[msg.sender].push(Ticket({combination: _combination, price: _price}));
     }
 
-    function getTickets(address player) public view returns(Ticket[] memory){
+    function getTickets(address player)
+        public
+        view
+        returns(Ticket[] memory)
+    {
         return players[player];
     }
 
@@ -78,6 +88,23 @@ contract LuckySix is VRFConsumerBase {
         }
     }
 
+    function cashEarned(address player)
+        public
+        view
+        returns(uint256)
+    {
+        uint256 n = getMapLength(player);
+        uint256 sum = 0;
+        int256 x;
+        for(uint i=0; i<n; i++){
+            x = returnIndexOfLastDrawnNumber(players[player][i].combination);
+            if(x != -1)
+                sum += xBonus[uint(x)] * players[player][i].price;
+        }
+        return sum;
+    }
+
+
     function removeByIndex(uint256 index, uint256[] memory array)
         internal
         pure
@@ -93,7 +120,7 @@ contract LuckySix is VRFConsumerBase {
         return tmp;
     }
 
-    function returnIndexOfLastDrawnNumber(uint256[] memory numbers)
+    function returnIndexOfLastDrawnNumber(uint256[6] memory numbers)
         public
         view
         returns (int256)
@@ -114,13 +141,29 @@ contract LuckySix is VRFConsumerBase {
         return (counter == 6 ? index : -1);
     }
 
-    function get48() internal pure returns (uint256[48] memory numbers) {
+    function getMapLength(address player)
+        public
+        view
+        returns (uint256)
+    {
+        return players[player].length;
+    }
+
+    function get48()
+        internal
+        pure
+        returns (uint256[48] memory numbers)
+    {
         for (uint256 i = 0; i < 48; i++)
             numbers[i] = i + 1;
         return numbers;
     }
 
-    function getDrawnNumbers() public view returns (uint256[] memory) {
+    function getDrawnNumbers()
+        public
+        view
+        returns (uint256[] memory)
+    {
         return _drawnNumbers;
     }
 }
