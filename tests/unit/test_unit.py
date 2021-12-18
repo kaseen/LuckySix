@@ -15,7 +15,7 @@ def test_drawn_numbers():
     if network.show_active() not in LOCAL_BLOCKCHAIN_ENVIRONMENTS:
         pytest.skip("Only for local testing!")
     account = get_account()
-    luckysix = deploy_and_fund()
+    luckysix = deploy_and_fund(account)
     # Act
     luckysix.drawNumbers({"from": account})
     drawnNumbers = luckysix.getDrawnNumbers()
@@ -29,7 +29,7 @@ def test_enter_lottery(test_combination, test_price):
     if network.show_active() not in LOCAL_BLOCKCHAIN_ENVIRONMENTS:
         pytest.skip("Only for local testing!")
     account = get_account()
-    luckysix = deploy_and_fund()
+    luckysix = deploy_and_fund(account)
     # Act
     luckysix.enterLottery(test_combination, test_price)
     # Assert
@@ -75,7 +75,7 @@ def test_lottery_multiple_users(player1, player2, player3):
     pl1 = get_account(index=1)
     pl2 = get_account(index=2)
     pl3 = get_account(index=3)
-    luckysix = deploy_and_fund()
+    luckysix = deploy_and_fund(owner)
     # Act
     luckysix.drawNumbers({"from": owner})
     luckysix.enterLottery(player1[0], player1[1],  {"from": pl1})

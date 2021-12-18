@@ -3,9 +3,9 @@
 pragma solidity ^0.8.0;
 
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract LuckySix is VRFConsumerBase {
-    // TODO: LuckySix is Ownable
+contract LuckySix is VRFConsumerBase, Ownable {
 
     bytes32 internal keyHash;
     uint256 internal fee;
@@ -55,7 +55,7 @@ contract LuckySix is VRFConsumerBase {
         players[msg.sender].push(Ticket({combination: _combination, bet: _bet}));
     }
 
-    function drawNumbers() public {
+    function drawNumbers() public onlyOwner{
         // TODO: prvo da je _randomResult>0
         // TODO: SAMO JEDNOM SME DA SE POZOVE
         // TODO: da je lokalan niz _allNumber su ovoj fji
