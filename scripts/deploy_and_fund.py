@@ -1,5 +1,5 @@
-from brownie import LuckySix, config, network, accounts
-from scripts.helpful_scripts import get_account, get_contract, fund_with_link
+from brownie import LuckySix, config, network
+from scripts.helpful_scripts import get_contract, fund_with_link
 
 # 'TransactionReceipt' object has no attribute 'address' kad se prvi put pokrece na nekoj mrezi?
 # ne radi ganache-local

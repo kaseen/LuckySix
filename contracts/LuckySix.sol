@@ -22,6 +22,14 @@ contract LuckySix is VRFConsumerBase, Ownable {
         uint256 bet;
     }
 
+    enum LOTTERY_STATE{
+        OPEN,
+        CLOSED,
+        CALCULATING_WINNER
+    }
+
+    LOTTERY_STATE public lottery_state;
+
     constructor(
         address _vrfCoordinator,
         address _link,
@@ -30,6 +38,7 @@ contract LuckySix is VRFConsumerBase, Ownable {
     ) VRFConsumerBase(_vrfCoordinator, _link) {
         keyHash = _keyhash;
         fee = _fee;
+        lottery_state = LOTTERY_STATE.CLOSED;
     }
 
     function getRandomNumber()
@@ -44,7 +53,6 @@ contract LuckySix is VRFConsumerBase, Ownable {
         internal
         override
     {
-        // TODO: require(randomness > 0, "random-not-found");
         _randomResult = randomness;
     }
 
@@ -52,14 +60,28 @@ contract LuckySix is VRFConsumerBase, Ownable {
         public
         payable
     {
+        require(lottery_state == LOTTERY_STATE.OPEN, "Lottery not open!");
         players[msg.sender].push(Ticket({combination: _combination, bet: _bet}));
     }
 
-    function drawNumbers() public onlyOwner{
-        // TODO: prvo da je _randomResult>0
-        // TODO: SAMO JEDNOM SME DA SE POZOVE
-        // TODO: da je lokalan niz _allNumber su ovoj fji
+    function startLottery() public onlyOwner{
+        require(lottery_state == LOTTERY_STATE.CLOSED, "Can't start!");
+        lottery_state = LOTTERY_STATE.OPEN;
+    }
 
+    function endLottery() public onlyOwner{
+        require(lottery_state == LOTTERY_STATE.OPEN, "Can't end!");
+        lottery_state = LOTTERY_STATE.CALCULATING_WINNER;
+        getRandomNumber();
+        drawNumbers();
+    }
+
+    function drawNumbers() public onlyOwner{
+        // TODO: da je lokalan niz _allNumber su ovoj fji
+        // TODO LOCAL: require(_randomResult > 0, "random-not-found");
+
+        require(_drawnNumbers.length == 0); // DrawNumbers cannot be called more than once
+        
         // set _allNumbers to [1, 2, 3, ..., 48]
         _allNumbers = get48();
         uint256 n = 35;

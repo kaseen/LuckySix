@@ -1,7 +1,5 @@
 from brownie import LinkToken, Contract, VRFCoordinatorMock, accounts, config, network
 
-# TODO: resiti problem kad se testira lokalno da pamti Nonce, mozda fork mreza?
-
 LOCAL_BLOCKCHAIN_ENVIRONMENTS = ["development", "ganache-local"]
 
 

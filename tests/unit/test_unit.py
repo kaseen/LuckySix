@@ -1,4 +1,4 @@
-from brownie import network
+from brownie import Contract, network, exceptions
 from scripts.deploy_and_fund import deploy_and_fund
 from scripts.helpful_scripts import LOCAL_BLOCKCHAIN_ENVIRONMENTS, get_account
 import pytest
@@ -24,6 +24,17 @@ def test_drawn_numbers():
     assert allUnique(drawnNumbers)
 
 
+def test_cant_enter_unless_started(test_combination, test_price):
+    # Arrange
+    if network.show_active() not in LOCAL_BLOCKCHAIN_ENVIRONMENTS:
+        pytest.skip("Only for local testing!")
+    account = get_account()
+    luckysix = deploy_and_fund(account)
+    # Act / Assert
+    with pytest.raises(exceptions.VirtualMachineError):
+        luckysix.enterLottery(test_combination, test_price, {"from": account})
+
+
 def test_enter_lottery(test_combination, test_price):
     # Arrange
     if network.show_active() not in LOCAL_BLOCKCHAIN_ENVIRONMENTS:
@@ -31,7 +42,8 @@ def test_enter_lottery(test_combination, test_price):
     account = get_account()
     luckysix = deploy_and_fund(account)
     # Act
-    luckysix.enterLottery(test_combination, test_price)
+    luckysix.startLottery({"from": account})
+    luckysix.enterLottery(test_combination, test_price, {"from": account})
     # Assert
     assert(len(luckysix.getTickets(account.address)) == 1)
     return luckysix
@@ -77,10 +89,11 @@ def test_lottery_multiple_users(player1, player2, player3):
     pl3 = get_account(index=3)
     luckysix = deploy_and_fund(owner)
     # Act
-    luckysix.drawNumbers({"from": owner})
+    luckysix.startLottery({"from": owner})
     luckysix.enterLottery(player1[0], player1[1],  {"from": pl1})
     luckysix.enterLottery(player2[0], player2[1],  {"from": pl2})
     luckysix.enterLottery(player3[0], player3[1],  {"from": pl3})
+    luckysix.endLottery({"from": owner})
     print(luckysix.cashEarned(pl1.address))
     print(luckysix.cashEarned(pl2.address))
     print(luckysix.cashEarned(pl3.address))

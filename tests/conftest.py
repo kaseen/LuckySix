@@ -1,4 +1,12 @@
+from brownie import LuckySix, network
+from scripts.helpful_scripts import LOCAL_BLOCKCHAIN_ENVIRONMENTS
 import pytest
+
+@pytest.fixture
+def get_lastest_contract():
+    if network.show_active() in LOCAL_BLOCKCHAIN_ENVIRONMENTS:
+        pytest.skip("Only for integration testing")
+    return LuckySix[-1]
 
 
 @pytest.fixture
