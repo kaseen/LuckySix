@@ -10,26 +10,25 @@ def get_lastest_contract():
 
 
 @pytest.fixture
-def test_combination():
-    return [10,26,4,40,46,11]
-    #return [1,2,7,4,8,6]
+def test1():
+    return ([6,9,10,16,20,23], 50)
 
 
 @pytest.fixture
-def test_price():
-    return 100
-
-
-@pytest.fixture
-def player1():
-    return ([10,26,4,40,46,11], 50)
-
-
-@pytest.fixture
-def player2():
+def test2():
     return ([10,26,4,40,46,28], 123)
 
 
 @pytest.fixture
-def player3():
-    return ([10,26,4,40,46,3], 200)
+def test3():
+    return ([1,10,20,30,40,43], 200)
+
+
+@pytest.fixture
+def test4():
+    return ([3,8,12,16,30,35], 300)
+
+
+@pytest.fixture
+def test5():
+    return ([13,19,21,31,41,45], 500)

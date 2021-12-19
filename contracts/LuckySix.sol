@@ -56,24 +56,28 @@ contract LuckySix is VRFConsumerBase, Ownable {
         _randomResult = randomness;
     }
 
-    function enterLottery(uint256[6] memory _combination, uint256 _bet)
-        public
-        payable
-    {
-        require(lottery_state == LOTTERY_STATE.OPEN, "Lottery not open!");
-        players[msg.sender].push(Ticket({combination: _combination, bet: _bet}));
-    }
-
     function startLottery() public onlyOwner{
         require(lottery_state == LOTTERY_STATE.CLOSED, "Can't start!");
         lottery_state = LOTTERY_STATE.OPEN;
     }
 
+    function enterLottery(uint256[6] memory _combination, uint256 _bet)
+        public
+        payable
+    {
+        require(lottery_state == LOTTERY_STATE.OPEN, "Lottery not open!");
+        // kad se posalje enterLottery bez kombinacije menja se stanje 
+        players[msg.sender].push(Ticket({combination: _combination, bet: _bet}));
+    }
+
     function endLottery() public onlyOwner{
         require(lottery_state == LOTTERY_STATE.OPEN, "Can't end!");
-        lottery_state = LOTTERY_STATE.CALCULATING_WINNER;
         getRandomNumber();
         drawNumbers();
+
+        // TODO: treba da isprazni mapu
+
+        lottery_state = LOTTERY_STATE.CLOSED;
     }
 
     function drawNumbers() public onlyOwner{
