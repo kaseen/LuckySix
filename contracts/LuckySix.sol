@@ -12,7 +12,7 @@ contract LuckySix is VRFConsumerBase, Ownable {
     uint256 public _randomResult;
 
     uint256[] internal _allNumbers;
-    uint256[] public _drawnNumbers;
+    uint256[] internal _drawnNumbers;
     uint256[] public xBonus = [0, 0, 0, 0, 0, 10000, 7500, 5000, 2500, 1000, 500, 300, 200, 150, 100, 90, 80, 70, 60, 50, 40, 30, 25, 20, 15, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
 
     mapping(address => Ticket[]) public players;
@@ -41,19 +41,13 @@ contract LuckySix is VRFConsumerBase, Ownable {
         lottery_state = LOTTERY_STATE.CLOSED;
     }
 
-    function getRandomNumber()
-        public
-        returns (bytes32 requestId)
-    {
-        require(LINK.balanceOf(address(this)) >= fee, "Not enough LINK - fill contract with faucet");
-        return requestRandomness(keyHash, fee);
-    }
-
     function fulfillRandomness(bytes32 requestId, uint256 randomness)
         internal
         override
     {
+        require(lottery_state == LOTTERY_STATE.CALCULATING_WINNER);
         _randomResult = randomness;
+        // drawNumbers();
     }
 
     function startLottery() public onlyOwner{
@@ -66,24 +60,21 @@ contract LuckySix is VRFConsumerBase, Ownable {
         payable
     {
         require(lottery_state == LOTTERY_STATE.OPEN, "Lottery not open!");
-        // kad se posalje enterLottery bez kombinacije menja se stanje 
         players[msg.sender].push(Ticket({combination: _combination, bet: _bet}));
     }
 
     function endLottery() public onlyOwner{
         require(lottery_state == LOTTERY_STATE.OPEN, "Can't end!");
-        getRandomNumber();
-        drawNumbers();
-
-        // TODO: treba da isprazni mapu
-
-        lottery_state = LOTTERY_STATE.CLOSED;
+        require(LINK.balanceOf(address(this)) >= fee, "Not enough LINK - fill contract with faucet");
+        lottery_state = LOTTERY_STATE.CALCULATING_WINNER;
+        bytes32 requestId = requestRandomness(keyHash, fee);
     }
 
     function drawNumbers() public onlyOwner{
         // TODO: da je lokalan niz _allNumber su ovoj fji
         // TODO LOCAL: require(_randomResult > 0, "random-not-found");
 
+        require(lottery_state == LOTTERY_STATE.CALCULATING_WINNER);
         require(_drawnNumbers.length == 0); // DrawNumbers cannot be called more than once
         
         // set _allNumbers to [1, 2, 3, ..., 48]
@@ -104,6 +95,7 @@ contract LuckySix is VRFConsumerBase, Ownable {
             // remove number we just added to _drawnNumbers from _allNumbers
             _allNumbers = removeByIndex(n, _allNumbers);
         }
+        lottery_state = LOTTERY_STATE.CLOSED;
     }
 
     function cashEarned(address player)
@@ -140,7 +132,7 @@ contract LuckySix is VRFConsumerBase, Ownable {
     }
 
     function returnIndexOfLastDrawnNumber(uint256[6] memory numbers)
-        public
+        internal
         view
         returns (int256)
     {
@@ -160,6 +152,7 @@ contract LuckySix is VRFConsumerBase, Ownable {
         return (counter == 6 ? index : -1);
     }
 
+    // TODO: ide u internal
     function getTickets(address player)
         public
         view

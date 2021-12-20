@@ -11,6 +11,8 @@ def test_only_owner_draw_numbers():
     owner = get_account()
     non_owner = get_account(index=1)
     luckysix = deploy_and_fund(owner)
+    luckysix.startLottery({"from": owner})
+    luckysix.endLottery({"from": owner})
     # Act / Assert
     with pytest.raises(exceptions.VirtualMachineError):
         luckysix.drawNumbers({"from": non_owner})

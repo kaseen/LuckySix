@@ -2,8 +2,6 @@ from brownie import LuckySix, config, network
 from scripts.helpful_scripts import get_contract, fund_with_link
 
 # 'TransactionReceipt' object has no attribute 'address' kad se prvi put pokrece na nekoj mrezi?
-# ne radi ganache-local
-
 
 def deploy_and_fund(account):
     luckysix = LuckySix.deploy(
@@ -15,7 +13,6 @@ def deploy_and_fund(account):
     )
     tx = fund_with_link(luckysix.address)
     tx.wait(1)
-    luckysix.getRandomNumber({"from": account})
     return luckysix
 
 
