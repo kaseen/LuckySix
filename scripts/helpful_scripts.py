@@ -18,22 +18,14 @@ def get_contract(contract_name):
     else:
         try:
             contract_address = config["networks"][network.show_active()][contract_name]
-            contract = Contract.from_abi(
-                contract_type._name, contract_address, contract_type.abi
-            )
+            contract = Contract.from_abi(contract_type._name, contract_address, contract_type.abi)
         except KeyError:
-            print(
-                f"{network.show_active()} address not found, perhaps you should add it to the config or deploy mocks?"
-            )
-            print(
-                f"brownie run scripts/deploy_mocks.py --network {network.show_active()}"
-            )
+            print(f"{network.show_active()} address not found, perhaps you should add it to the config or deploy mocks?")
+            print(f"brownie run scripts/deploy_mocks.py --network {network.show_active()}")
     return contract
 
 
-def fund_with_link(
-    contract_address, account=None, link_token=None, amount=1000000000000000000
-):
+def fund_with_link(contract_address, account=None, link_token=None, amount=100000000000000000):
     account = account if account else get_account()
     link_token = link_token if link_token else get_contract("link_token")
     tx = link_token.transfer(contract_address, amount, {"from": account})
@@ -42,17 +34,9 @@ def fund_with_link(
 
 
 def deploy_mocks():
-    print(f"The active network is {network.show_active()}")
-    print("Deploying Mocks...")
     account = get_account()
-    print("Deploying Mock Link Token...")
     link_token = LinkToken.deploy({"from": account})
-    print("Deploying Mock VRFCoordinator...")
-    mock_vrf_coordinator = VRFCoordinatorMock.deploy(
-        link_token.address, {"from": account}
-    )
-    print(f"Deployed to {mock_vrf_coordinator.address}")
-    print("Mocks Deployed!")
+    VRFCoordinatorMock.deploy(link_token.address, {"from": account})
 
 
 def get_account(index=None, id=None):

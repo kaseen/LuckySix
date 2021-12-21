@@ -16,6 +16,7 @@ contract LuckySix is VRFConsumerBase, Ownable {
     uint256[] public xBonus = [0, 0, 0, 0, 0, 10000, 7500, 5000, 2500, 1000, 500, 300, 200, 150, 100, 90, 80, 70, 60, 50, 40, 30, 25, 20, 15, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
 
     mapping(address => Ticket[]) public players;
+    address[] internal listOfPlayers;
 
     struct Ticket{
         uint256[6] combination;
@@ -61,6 +62,15 @@ contract LuckySix is VRFConsumerBase, Ownable {
     {
         require(lottery_state == LOTTERY_STATE.OPEN, "Lottery not open!");
         players[msg.sender].push(Ticket({combination: _combination, bet: _bet}));
+        // Tracking players entered to empty map at the end of lottery
+        bool insert = true;
+        for(uint i=0; i<listOfPlayers.length; i++)
+            if(listOfPlayers[i] == msg.sender){
+                insert = false;
+                break;
+            }
+        if(insert)
+            listOfPlayers.push(msg.sender);
     }
 
     function endLottery() public onlyOwner{
@@ -70,34 +80,51 @@ contract LuckySix is VRFConsumerBase, Ownable {
         bytes32 requestId = requestRandomness(keyHash, fee);
     }
 
+    function emptyMap() public onlyOwner{
+        for(uint256 i=0; i<listOfPlayers.length; i++){
+            deletePlayer(listOfPlayers[i]);
+        }
+        delete(listOfPlayers);
+    }
+
+    function deletePlayer(address x) internal{
+        // Delete all Tickets of given address
+        Ticket[] storage tickets = players[x];
+        for(uint256 i=0; i<tickets.length; i++){
+                delete(tickets[i].combination);
+                delete(tickets[i].bet);
+        }
+        // Delete player from map
+        delete(players[x]);
+    }
+
     function drawNumbers() public onlyOwner{
         // TODO: da je lokalan niz _allNumber su ovoj fji
         // TODO LOCAL: require(_randomResult > 0, "random-not-found");
 
         require(lottery_state == LOTTERY_STATE.CALCULATING_WINNER);
-        require(_drawnNumbers.length == 0); // DrawNumbers cannot be called more than once
+        require(_drawnNumbers.length == 0); // drawNumbers() cannot be called more than once
         
-        // set _allNumbers to [1, 2, 3, ..., 48]
         _allNumbers = get48();
         uint256 n = 35;
 
-        // get 35 randomNumbers from randomValue
+        // Get 35 randomNumbers from randomValue
         uint256[] memory randomNumbers = new uint256[](n);
         for (uint256 i = 0; i < n; i++) {
             randomNumbers[i] = uint256(keccak256(abi.encode(_randomResult, i)));
         }
 
         for (uint256 i = 48; i != 13; i--) {
-            // n is now index of number to pick from _allNumbers list
             n = randomNumbers[(i - 1) - 13] % i;
-            // push drawn number to list
+            // Push drawn number to list
             _drawnNumbers.push(_allNumbers[n]);
-            // remove number we just added to _drawnNumbers from _allNumbers
+            // Remove number we just added to _drawnNumbers from _allNumbers
             _allNumbers = removeByIndex(n, _allNumbers);
         }
         lottery_state = LOTTERY_STATE.CLOSED;
     }
 
+    // cashEarned => payout
     function cashEarned(address player)
         public
         view
@@ -126,7 +153,7 @@ contract LuckySix is VRFConsumerBase, Ownable {
             tmp[i] = array[i];
         }
         for (uint256 i = index + 1; i < array.length; i++) {
-            tmp[i - 1] = array[i];
+            tmp[i-1] = array[i];
         }
         return tmp;
     }
@@ -177,5 +204,14 @@ contract LuckySix is VRFConsumerBase, Ownable {
         returns (uint256[] memory)
     {
         return _drawnNumbers;
+    }
+
+    function getListOfPlayers()
+        public
+        view
+        onlyOwner
+        returns (address[] memory)
+    {
+        return listOfPlayers;
     }
 }

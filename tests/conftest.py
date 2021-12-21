@@ -21,14 +21,4 @@ def test2():
 
 @pytest.fixture
 def test3():
-    return ([1,10,20,30,40,43], 200)
-
-
-@pytest.fixture
-def test4():
-    return ([3,8,12,16,30,35], 300)
-
-
-@pytest.fixture
-def test5():
-    return ([13,19,21,31,41,45], 500)
+    return ([1,10,20,30,40,43], 207)

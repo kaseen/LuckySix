@@ -37,7 +37,7 @@ def test_drawn_numbers():
     assert allUnique(drawnNumbers)
 
 
-def test_lottery_multiple_users(test1, test2, test3):
+def test_empty_map_multiple_users(test1, test2, test3):
     # Arrange
     if network.show_active() not in LOCAL_BLOCKCHAIN_ENVIRONMENTS:
         pytest.skip("Only for local testing!")
@@ -53,6 +53,10 @@ def test_lottery_multiple_users(test1, test2, test3):
     luckysix.enterLottery(test3[0], test3[1],  {"from": pl3})
     luckysix.endLottery({"from": owner})
     luckysix.drawNumbers({"from": owner})
-    print(luckysix.cashEarned(pl1.address))
-    print(luckysix.cashEarned(pl2.address))
-    print(luckysix.cashEarned(pl3.address))
+    tx = luckysix.emptyMap({"from": owner})
+    tx.wait(1)
+    # Assert
+    assert(len(luckysix.getTickets(pl1.address)) == 0)
+    assert(len(luckysix.getTickets(pl2.address)) == 0)
+    assert(len(luckysix.getTickets(pl3.address)) == 0)
+    assert(len(luckysix.getListOfPlayers()) == 0)
