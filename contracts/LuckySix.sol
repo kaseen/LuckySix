@@ -51,17 +51,20 @@ contract LuckySix is VRFConsumerBase, Ownable {
         // drawNumbers();
     }
 
-    function startLottery() public onlyOwner{
+    function startLottery()
+        public
+        onlyOwner
+    {
         require(lottery_state == LOTTERY_STATE.CLOSED, "Can't start!");
         lottery_state = LOTTERY_STATE.OPEN;
     }
 
-    function enterLottery(uint256[6] memory _combination, uint256 _bet)
+    function enterLottery(uint256[6] memory _combination)
         public
         payable
     {
         require(lottery_state == LOTTERY_STATE.OPEN, "Lottery not open!");
-        players[msg.sender].push(Ticket({combination: _combination, bet: _bet}));
+        players[msg.sender].push(Ticket({combination: _combination, bet: msg.value}));
         // Tracking players entered to empty map at the end of lottery
         bool insert = true;
         for(uint i=0; i<listOfPlayers.length; i++)
@@ -73,21 +76,29 @@ contract LuckySix is VRFConsumerBase, Ownable {
             listOfPlayers.push(msg.sender);
     }
 
-    function endLottery() public onlyOwner{
+    function endLottery()
+        public
+        onlyOwner
+    {
         require(lottery_state == LOTTERY_STATE.OPEN, "Can't end!");
         require(LINK.balanceOf(address(this)) >= fee, "Not enough LINK - fill contract with faucet");
         lottery_state = LOTTERY_STATE.CALCULATING_WINNER;
         bytes32 requestId = requestRandomness(keyHash, fee);
     }
 
-    function emptyMap() public onlyOwner{
+    function emptyMap()
+        public
+        onlyOwner
+    {
         for(uint256 i=0; i<listOfPlayers.length; i++){
             deletePlayer(listOfPlayers[i]);
         }
         delete(listOfPlayers);
     }
 
-    function deletePlayer(address x) internal{
+    function deletePlayer(address x)
+        internal
+    {
         // Delete all Tickets of given address
         Ticket[] storage tickets = players[x];
         for(uint256 i=0; i<tickets.length; i++){
@@ -98,10 +109,12 @@ contract LuckySix is VRFConsumerBase, Ownable {
         delete(players[x]);
     }
 
-    function drawNumbers() public onlyOwner{
+    function drawNumbers()
+        public
+        onlyOwner
+    {
         // TODO: da je lokalan niz _allNumber su ovoj fji
         // TODO LOCAL: require(_randomResult > 0, "random-not-found");
-
         require(lottery_state == LOTTERY_STATE.CALCULATING_WINNER);
         require(_drawnNumbers.length == 0); // drawNumbers() cannot be called more than once
         
@@ -179,6 +192,19 @@ contract LuckySix is VRFConsumerBase, Ownable {
         return (counter == 6 ? index : -1);
     }
 
+    function withdraw()
+        public
+        payable
+        onlyOwner
+    {
+        payable(msg.sender).transfer(address(this).balance);
+    }
+
+    function donate()
+        public
+        payable
+    {}
+
     // TODO: ide u internal
     function getTickets(address player)
         public
@@ -186,6 +212,15 @@ contract LuckySix is VRFConsumerBase, Ownable {
         returns(Ticket[] memory)
     {
         return players[player];
+    }
+
+    function getBalance()
+        public
+        view
+        onlyOwner
+        returns(uint256)
+    {
+        return address(this).balance;
     }
 
     function get48()

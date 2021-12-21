@@ -18,7 +18,7 @@ def test_cant_enter_unless_started(test1):
     luckysix = deploy_and_fund(account)
     # Act / Assert
     with pytest.raises(exceptions.VirtualMachineError):
-        luckysix.enterLottery(test1[0], test1[1], {"from": account})
+        luckysix.enterLottery(test1[0], {"from": account, "value": test1[1]})
 
 
 def test_drawn_numbers():
@@ -48,13 +48,12 @@ def test_empty_map_multiple_users(test1, test2, test3):
     luckysix = deploy_and_fund(owner)
     # Act
     luckysix.startLottery({"from": owner})
-    luckysix.enterLottery(test1[0], test1[1],  {"from": pl1})
-    luckysix.enterLottery(test2[0], test2[1],  {"from": pl2})
-    luckysix.enterLottery(test3[0], test3[1],  {"from": pl3})
+    luckysix.enterLottery(test1[0], {"from": pl1, "value": test1[1]})
+    luckysix.enterLottery(test2[0], {"from": pl2, "value": test2[1]})
+    luckysix.enterLottery(test3[0], {"from": pl3, "value": test3[1]})
     luckysix.endLottery({"from": owner})
     luckysix.drawNumbers({"from": owner})
-    tx = luckysix.emptyMap({"from": owner})
-    tx.wait(1)
+    luckysix.emptyMap({"from": owner})
     # Assert
     assert(len(luckysix.getTickets(pl1.address)) == 0)
     assert(len(luckysix.getTickets(pl2.address)) == 0)
