@@ -11,14 +11,14 @@ def get_lastest_contract():
 
 @pytest.fixture
 def test1():
-    return ([6,9,10,16,20,23], 0.001 * 10 ** 18)
+    return ([13,17,28,31,1,41], 0.013 * 10 ** 18)
 
 
 @pytest.fixture
 def test2():
-    return ([10,26,4,40,46,28], 0.0002 * 10 ** 18)
+    return ([1,2,3,4,5,6], 0.05 * 10 ** 18)
 
 
 @pytest.fixture
 def test3():
-    return ([1,10,20,30,40,43], 0.00003 * 10 ** 18)
+    return ([6,9,13,19,23,43], 0.0069 * 10 ** 18)

@@ -58,6 +58,7 @@ contract LuckySix is VRFConsumerBase, Ownable {
         payable
     {
         require(lottery_state == LOTTERY_STATE.OPEN, "Lottery not open!");
+        require(checkIfValid(_combination) == true, "Not valid combination");
         players[msg.sender].push(Ticket({combination: _combination, bet: msg.value}));
         // Tracking players entered to empty map at the end of lottery
         bool insert = true;
@@ -211,6 +212,25 @@ contract LuckySix is VRFConsumerBase, Ownable {
             }
         }
         return (counter == 6 ? index : -1);
+    }
+
+    function checkIfValid(uint256[6] memory _combination)
+        internal
+        pure 
+        returns(bool)
+    {
+        for(uint256 i=0; i<_combination.length; i++){
+            // Check if number is between 1 and 48
+            if(_combination[i] < 1 || _combination[i] > 48)
+                return false;
+
+            // Check if number is unique
+            for(uint256 j=i+1; j<_combination.length; j++){
+                if(_combination[i] == _combination[j])
+                    return false;
+            }
+        }
+        return true;
     }
 
     function withdraw(uint256 amount)

@@ -68,5 +68,8 @@ def test_payout(get_lastest_contract):
     assert(luckysix._randomResult() != 0)
     tx = luckysix.payout({"from": account})
     tx.wait(2)
+    print(luckysix.getDrawnNumbers())
     assert(len(luckysix.getDrawnNumbers()) != 0)
     assert(luckysix.lottery_state() == 1)
+
+    print(luckysix.getETHBalance({"from": account}))
