@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract LuckySix is VRFConsumerBase, Ownable {
+contract LuckySix is VRFConsumerBase, Ownable { 
 
     bytes32 internal keyHash;
     uint256 internal fee;
