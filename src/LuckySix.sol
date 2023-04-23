@@ -8,6 +8,7 @@ import '@openzeppelin/contracts/access/Ownable.sol';
 import 'forge-std/console.sol';
 
 // TODO: Function that gets tickets played by msg.sender at round passed as argument
+// TODO: Pack 35 drawn numbers into single uint256 (lesser gas cost)
 
 contract LuckySix is VRFConsumerBase, Ownable {
 
@@ -31,7 +32,7 @@ contract LuckySix is VRFConsumerBase, Ownable {
     mapping(address => mapping(uint256 => Ticket[])) private players;
 
     // Keep track of drawn numbers for each round
-    mapping(uint256 => uint256[6]) public drawnNumbers;
+    mapping(uint256 => uint256[35]) public drawnNumbers;
 
     // Last verified random number
     uint256 private randomNumber;
@@ -45,8 +46,6 @@ contract LuckySix is VRFConsumerBase, Ownable {
     bytes32 internal keyHash;
     uint256 internal fee;
 
-    uint256[] internal _allNumbers;
-    uint256[] internal _drawnNumbers;
     uint256[] internal bonusMultiplier = [
         0, 0, 0, 0, 0, 10000, 7500, 5000, 
         2500, 1000, 500, 300, 200, 150, 100, 
@@ -69,9 +68,6 @@ contract LuckySix is VRFConsumerBase, Ownable {
 
     function startLottery() public onlyOwner {
         require(lotteryState == LOTTERY_STATE.CLOSED, 'Can\'t start!');
-        // TODO
-        delete(_drawnNumbers);
-        delete(_allNumbers);
         delete(randomNumber);
 
         lotteryState = LOTTERY_STATE.OPEN;
@@ -97,6 +93,35 @@ contract LuckySix is VRFConsumerBase, Ownable {
     function fulfillRandomness(bytes32 requestId, uint256 randomness) internal override {
         require(lotteryState == LOTTERY_STATE.CALCULATING_WINNER); requestId;
         randomNumber = randomness;
+    }
+
+    function drawNumbers() public onlyOwner {
+        require(lotteryState == LOTTERY_STATE.CALCULATING_WINNER, 'Lottery has not ended');
+
+        // Generate numbers 1-48
+        uint256[48] memory allNumbers;
+        for(uint256 i = 0; i < 48; i++)
+            allNumbers[i] = i + 1;
+
+        // Get 35 randomNumbers from randomValue
+        uint256[] memory randomNumbers = new uint256[](35);
+        for (uint256 i = 0; i < 35; i++)
+            randomNumbers[i] = uint256(keccak256(abi.encode(block.timestamp, randomNumber, i)));
+
+        // Draw numbers
+        uint256 j = allNumbers.length - 1;
+        for(uint256 i = 0; i < randomNumbers.length; i++){
+            uint256 indexOfChosenNumber = randomNumbers[i] % j;
+
+            // Swap drawn number to the end of array [0, j] and decrement j
+            uint256 tmp = allNumbers[j];
+            allNumbers[j] = allNumbers[indexOfChosenNumber];
+            allNumbers[indexOfChosenNumber] = tmp;
+
+            drawnNumbers[numOfRound][i] = allNumbers[j];
+
+            j--;
+        }
     }
 
     /*
@@ -126,33 +151,7 @@ contract LuckySix is VRFConsumerBase, Ownable {
     }
     */
 
-    // TODO: public -> private
-    function drawNumbers() public onlyOwner {
-        // TODO: da je lokalan niz _allNumber su ovoj fji
-        // TODO LOCAL: require(randomNumber > 0, "random-not-found");
-        require(lotteryState == LOTTERY_STATE.CALCULATING_WINNER);
-        // TODO: require(_drawnNumbers.length == 0); // drawNumbers() cannot be called more than once
 
-        uint256[48] memory allNumbers;
-        for(uint256 i = 0; i < 48; i++)
-            allNumbers[i] = i + 1;
-
-        // Get 35 randomNumbers from randomValue
-        uint256[] memory randomNumbers = new uint256[](35);
-        for (uint256 i = 0; i < 35; i++) {
-            randomNumbers[i] = uint256(keccak256(abi.encode(block.timestamp, randomNumber, i)));
-        }
-
-        // TODO:
-        for (uint256 i = 48; i != 13; i--) {
-            uint256 n = randomNumbers[(i - 1) - 13] % i;
-            // Push drawn number to list
-            _drawnNumbers.push(allNumbers[n]);
-            // Remove number we just added to _drawnNumbers from allNumbers
-            allNumbers[n] = allNumbers[allNumbers.length - 1];
-            //allNumbers = removeByIndex(n, allNumbers);
-        }
-    }
 
     /*
     function emptyMap()
@@ -200,21 +199,7 @@ contract LuckySix is VRFConsumerBase, Ownable {
     }
     */
 
-    function removeByIndex(uint256 index, uint256[] memory array)
-        internal
-        pure
-        returns (uint256[] memory)
-    {
-        uint256[] memory tmp = new uint256[](array.length - 1);
-        for (uint256 i = 0; i < index; i++) {
-            tmp[i] = array[i];
-        }
-        for (uint256 i = index + 1; i < array.length; i++) {
-            tmp[i-1] = array[i];
-        }
-        return tmp;
-    }
-
+	/*
     function returnIndexOfLastDrawnNumber(uint256[6] memory numbers)
         internal
         view
@@ -232,6 +217,7 @@ contract LuckySix is VRFConsumerBase, Ownable {
         }
         return (counter == 6 ? index : -1);
     }
+	*/
 
     function checkIfValid(uint256[6] memory combination) private pure returns(bool) {
         for(uint256 i = 0; i < combination.length; i++) {
@@ -278,16 +264,7 @@ contract LuckySix is VRFConsumerBase, Ownable {
         return LINK.balanceOf(address(this));
     }
 
-    function get48()
-        internal
-        pure
-        returns (uint256[48] memory numbers)
-    {
-        for (uint256 i = 0; i < 48; i++)
-            numbers[i] = i + 1;
-        return numbers;
-    }
-
+	/*
     function getDrawnNumbers()
         public
         view
@@ -295,6 +272,7 @@ contract LuckySix is VRFConsumerBase, Ownable {
     {
         return _drawnNumbers;
     }
+	*/
 
     /*
     function getListOfPlayers()
