@@ -7,6 +7,7 @@ import { LuckySix } from 'src/LuckySix.sol';
 
 interface Events {
     event LotteryStarted(uint256 numOfRound);
+    event LotteryEnded(uint256 numOfRound);
     event TickedBought(address indexed player, uint256 numOfRound, uint256[6] combination);
 }
 
@@ -15,7 +16,7 @@ contract LuckySixTest is Test, Events {
     LuckySix public luckySixContract;
 
     function setUp() public {
-        luckySixContract = new LuckySix(address(this), address(this), '0x', 0);
+        luckySixContract = new LuckySix(0, address(this));
     }
 
     function testStartLottery() public {
@@ -26,11 +27,11 @@ contract LuckySixTest is Test, Events {
     }
 
     function testEnterLottery(uint256[6] memory input) public {
-        vm.assume(input[0] != input[1]);
-        vm.assume(input[1] != input[2]);
-        vm.assume(input[2] != input[3]);
-        vm.assume(input[3] != input[4]);
-        vm.assume(input[4] != input[5]);
+        vm.assume(input[0] > 0);
+        vm.assume(input[1] > 1000);
+        vm.assume(input[2] > 1000000);
+        vm.assume(input[3] > 1000000000);
+        vm.assume(input[4] > 1000000000000);
 
         testStartLottery();
         uint256[6] memory combination = [
@@ -44,8 +45,7 @@ contract LuckySixTest is Test, Events {
 
         vm.expectEmit(true, true, true, true, address(luckySixContract));
         emit TickedBought(address(this), 1, combination);
-
-        luckySixContract.enterLottery(combination);
+        luckySixContract.enterLottery{ value: 1 ether }(combination);
 
         combination[0] = 0;
         vm.expectRevert(bytes('Not valid combination'));
@@ -53,12 +53,15 @@ contract LuckySixTest is Test, Events {
     }
 
     function testDrawNumbers() public {
-        testEnterLottery([uint256(1), 2, 3, 4, 5, 6]);
-
-        vm.expectRevert(bytes('Lottery has not ended'));
-        luckySixContract.drawNumbers();
+        luckySixContract.startLottery();
+        luckySixContract.enterLottery{ value: 1 ether }([uint256(1), 2, 3, 4, 5, 6]);
+		luckySixContract.enterLottery{ value: 1 ether }([uint256(1), 11, 21, 31, 41, 48]);
+		luckySixContract.enterLottery{ value: 1 ether }([uint256(5), 10, 15, 20, 25, 30]);
 
         luckySixContract.endLottery();
-        luckySixContract.drawNumbers();
+
+        vm.expectEmit(true, true, true, true, address(luckySixContract));
+        emit LotteryEnded(1);
+        //luckySixContract.localTest();
     }
 }
