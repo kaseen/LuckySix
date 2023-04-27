@@ -5,6 +5,8 @@ pragma solidity ^0.8.19;
 import 'forge-std/Test.sol';
 import { LuckySix } from 'src/LuckySix.sol';
 
+import 'forge-std/console.sol';
+
 interface Events {
     event LotteryStarted(uint256 numOfRound);
     event LotteryEnded(uint256 numOfRound);
@@ -55,13 +57,11 @@ contract LuckySixTest is Test, Events {
     function testDrawNumbers() public {
         luckySixContract.startLottery();
         luckySixContract.enterLottery{ value: 1 ether }([uint256(1), 2, 3, 4, 5, 6]);
-		luckySixContract.enterLottery{ value: 1 ether }([uint256(1), 11, 21, 31, 41, 48]);
-		luckySixContract.enterLottery{ value: 1 ether }([uint256(5), 10, 15, 20, 25, 30]);
-
-        luckySixContract.endLottery();
+        luckySixContract.enterLottery{ value: 1 ether }([uint256(1), 11, 21, 31, 41, 48]);
+        luckySixContract.enterLottery{ value: 1 ether }([uint256(5), 10, 15, 20, 25, 30]);
 
         vm.expectEmit(true, true, true, true, address(luckySixContract));
         emit LotteryEnded(1);
-        //luckySixContract.localTest();
+        luckySixContract.endLotteryForLocalTesting();
     }
 }
