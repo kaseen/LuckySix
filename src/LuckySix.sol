@@ -9,12 +9,14 @@ import './interfaces/ILuckySix.sol';
 
 import 'forge-std/console.sol';
 
-// TODO: Function that gets tickets played by msg.sender at round passed as argument
+// TODO: checkIfValid unique combination array memory[12] sort by middle (gas optimization)
 
 contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable {
 
     uint256 public numOfRound;
+    uint256 public platformFee = 0.01 ether;
     uint256 private lastVerifiedRandomNumber;
+    uint256 private ownerBalance;
 
     uint256 constant NUMBER_OF_DRAWS = 35;
     uint256 constant MASK_00111111 = 2 ** 6 - 1;
@@ -60,11 +62,13 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable {
 
     function enterLottery(uint256[6] memory combination) public payable {
         require(lotteryState == LOTTERY_STATE.OPEN, 'Lottery not open!');
-        require(checkIfValid(combination), 'Not valid combination');
-        require(msg.value != 0);
-        players[msg.sender][numOfRound].push(Ticket({ combination: combination, bet: msg.value }));
+        require(checkIfValid(combination), 'Not valid combination.');
+        require(msg.value > platformFee, 'Not enough funds.');
+        players[msg.sender][numOfRound].push(Ticket({ combination: combination, bet: msg.value - platformFee }));
 
-        emit TickedBought(msg.sender, numOfRound, combination);
+        ownerBalance += platformFee;
+
+        emit TicketBought(msg.sender, numOfRound, combination);
     }
 
     function endLottery() public onlyOwner {
@@ -93,8 +97,9 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable {
         emit RequestFulfilled(requestId);
     }
 
+    // TODO: Automation
     function drawNumbers(uint256 randomNumber) private {
-        require(lotteryState == LOTTERY_STATE.CALCULATING_WINNER, 'Lottery has not ended');
+        require(lotteryState == LOTTERY_STATE.CALCULATING_WINNER, 'Lottery has not ended.');
 
         // Generate numbers 1-48
         uint256[48] memory allNumbers;
@@ -130,7 +135,7 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable {
         emit LotteryEnded(numOfRound);
     }
 
-    function checkIfValid(uint256[6] memory combination) private pure returns(bool) {
+    function checkIfValid(uint256[6] memory combination) private pure returns (bool) {
         for(uint256 i; i < combination.length; ++i) {
             // Check if number is between 1 and 48
             if(combination[i] < 1 || combination[i] > 48)
@@ -144,78 +149,71 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable {
         return true;
     }
 
-    function unpackResultForRound(uint n) public view returns(uint8[] memory) {
-        uint8[] memory result = new uint8[](NUMBER_OF_DRAWS);
+    function unpackResultForRound(uint256 n) public view returns (uint256[] memory) {
+        uint256[] memory result = new uint256[](NUMBER_OF_DRAWS);
         uint256 tmp = NUMBER_OF_DRAWS - 1;
         uint256 packedResult = drawnNumbers[n];
 
         for(uint256 i; i < NUMBER_OF_DRAWS; ++i)
-            result[tmp - i] = uint8((packedResult >> i * 6) & MASK_00111111);
+            result[tmp - i] = (packedResult >> i * 6) & MASK_00111111;
 
         return result;
     }
 
-    function withdraw(uint256 amount)
-        public
-        payable
-        onlyOwner
-    {
-        payable(msg.sender).transfer(amount);
+    function getPayoutForTicket(uint256 round, uint256 indexOfTicket) public {
+        require(players[msg.sender][round][indexOfTicket].bet > 0, 'Ticket already cashed out.');
+
+        // Calculate index of last drawn number
+        uint256 index = returnIndexOfLastDrawnNumber(round, players[msg.sender][round][indexOfTicket].combination);
+
+        require(index < (NUMBER_OF_DRAWS - 1), 'Ticket not valid.');
+        uint256 cashEarned = bonusMultiplier[index] * players[msg.sender][round][indexOfTicket].bet;
+
+        // If platform doesn't have enought balance give all to winning player
+        uint256 balance = platformBalance();
+        if(cashEarned > balance)
+            cashEarned = balance;
+
+        payable(msg.sender).transfer(cashEarned);
+
+        // Ticket is invalid when bet equals 0
+        players[msg.sender][round][indexOfTicket].bet = 0;
+        emit TicketCashedOut(msg.sender, round, indexOfTicket, cashEarned);
     }
 
-    /*
-    function deletePlayer(address x)
-        internal
-    {
-        // Delete all Tickets of given address
-        Ticket[] storage tickets = players[x];
-        for(uint256 i=0; i<tickets.length; i++){
-                delete(tickets[i].combination);
-                delete(tickets[i].bet);
-        }
-        // Delete player from map
-        delete(players[x]);
-    }
-    */
-
-    /*
-    function cashEarned(address player)
-        internal
-        returns(uint256)
-    {
-        // How many tickets players bought
-        uint256 n = players[player].length;
-        uint256 sum = 0;
-        int256 x;
-        for(uint i=0; i<n; i++){
-            x = returnIndexOfLastDrawnNumber(players[player][i].combination);
-            // If Ticket[i] won lottery, he gained bonusMultiplier[i] * Ticket[i].bet
-            if(x != -1)
-                sum += bonusMultiplier[uint(x)] * players[player][i].bet;
-        }
-        return sum;
-    }
-    */
-
-    /*
-    function returnIndexOfLastDrawnNumber(uint256[6] memory numbers)
-        internal
-        view
-        returns (int256)
-    {
+    function returnIndexOfLastDrawnNumber(uint256 round, uint256[6] memory ticketNumbers) private view returns (uint256) {
+        uint256[] memory combination = unpackResultForRound(round);
         uint256 counter = 0;
         int256 index = -1;
-        for (uint256 i = 0; i < numbers.length; i++) {
-            for (uint256 j = 0; j < _drawnNumbers.length; j++) {
-                if (numbers[i] == _drawnNumbers[j]) {
+
+        for (uint256 i; i < ticketNumbers.length; ++i)
+            for (uint256 j; j < combination.length; ++j)
+                if (ticketNumbers[i] == combination[j]){
                     counter++;
                     index = int256(j) > index ? int256(j) : index;
                 }
-            }
-        }
-        return (counter == 6 ? index : -1);
+
+        // Return anything more than NUMBER_OF_DRAWS-1 if not valid, return 100 for example
+        return (counter == 6 ? uint256(index) : 100);
     }
-    */
+
+    function platformBalance() public view returns (uint256) {
+        return address(this).balance - ownerBalance;
+    }
+
+    function getTicketsForRound(uint256 n) public view returns(Ticket[] memory) {
+        return players[msg.sender][n];
+    }
+
+    function withdrawPlatformFee() public payable onlyOwner {
+        platformFee = 0;
+        payable(msg.sender).transfer(platformFee);
+    }
+
+    function setPlatformFee(uint256 amount) public onlyOwner {
+        platformFee = amount;
+        emit PlatformFeeChanged(amount);
+    }
 
     // TODO: For local testing
     function endLotteryForLocalTesting() public {
