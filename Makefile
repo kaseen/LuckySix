@@ -13,7 +13,7 @@ install :;
 
 # Deploy to Sepolia Testnet
 deploy:
-	forge create --rpc-url ${RPC_URL} --private-key ${PRIVATE_KEY} src/LuckySix.sol:LuckySix --constructor-args ${VRF_SUBSCRIPTION_ID} ${VRF_COORDINATOR}
+	forge create --rpc-url ${RPC_URL} --private-key ${PRIVATE_KEY} src/LuckySix.sol:LuckySix --constructor-args ${VRF_SUBSCRIPTION_ID} ${VRF_COORDINATOR} ${CHAINLINK_KEEPER}
 
 # Test chainlink randomness
 testRandomness: openLottery endLottery

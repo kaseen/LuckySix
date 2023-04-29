@@ -3,6 +3,7 @@
 pragma solidity ^0.8.19;
 
 import '@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol';
+import '@chainlink/contracts/src/v0.8/automation/AutomationCompatible.sol';
 import '@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol';
 import '@openzeppelin/contracts/access/Ownable.sol';
 import './interfaces/ILuckySix.sol';
@@ -10,10 +11,11 @@ import './interfaces/ILuckySix.sol';
 import 'forge-std/console.sol';
 
 // TODO: checkIfValid unique combination array memory[12] sort by middle (gas optimization)
+// TODO: play ticket for upcoming rounds
 
-contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable {
+contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatibleInterface {
 
-    uint256 public numOfRound;
+    Round public roundInfo;
     uint256 public platformFee = 0.01 ether;
     uint256 private lastVerifiedRandomNumber;
     uint256 private ownerBalance;
@@ -27,6 +29,7 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable {
     uint256 public lastRequestId;
     bytes32 keyHash = 0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c;
     uint32 callbackGasLimit = 100000;
+    address private keeperAddress;
 
     // Keep track of current lotteryState
     LOTTERY_STATE public lotteryState;
@@ -46,60 +49,52 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable {
 
     constructor(
         uint64 subscriptionId,
-        address vrfCoordinator
+        address vrfCoordinator,
+        address keeperAddr
     ) VRFConsumerBaseV2 (vrfCoordinator) {
         COORDINATOR = VRFCoordinatorV2Interface(vrfCoordinator);
-        lotteryState = LOTTERY_STATE.CLOSED;
         s_subscriptionId = subscriptionId;
-        numOfRound = 0;
+        keeperAddress = keeperAddr;
+        lotteryState = LOTTERY_STATE.CLOSED;
+        roundInfo.numberOfRound = 0;
+        roundInfo.isStarted = false;
     }
 
-    function startLottery() public onlyOwner {
+    function openRound() public onlyOwner {
         require(lotteryState == LOTTERY_STATE.CLOSED, 'Can\'t start!');
-        lotteryState = LOTTERY_STATE.OPEN;
-        emit LotteryStarted(++numOfRound);
+        lotteryState = LOTTERY_STATE.READY;
+        roundInfo.isStarted = false;
+        emit RoundStarted(++roundInfo.numberOfRound);
     }
 
-    function enterLottery(uint256[6] memory combination) public payable {
-        require(lotteryState == LOTTERY_STATE.OPEN, 'Lottery not open!');
+    function playTicket(uint256[6] memory combination) public payable {
+        require(lotteryState == LOTTERY_STATE.READY || lotteryState == LOTTERY_STATE.STARTED, 'Lottery not open!');
         require(checkIfValid(combination), 'Not valid combination.');
         require(msg.value > platformFee, 'Not enough funds.');
-        players[msg.sender][numOfRound].push(Ticket({ combination: combination, bet: msg.value - platformFee }));
 
+        if(!roundInfo.isStarted){
+            lotteryState = LOTTERY_STATE.STARTED;
+            roundInfo.isStarted = true;
+            roundInfo.timeStarted = block.timestamp;
+            emit CountdownStarted(roundInfo.numberOfRound);
+        }
+
+        players[msg.sender][roundInfo.numberOfRound].push(Ticket({ combination: combination, bet: msg.value - platformFee }));
         ownerBalance += platformFee;
 
-        emit TicketBought(msg.sender, numOfRound, combination);
+        emit TicketBought(msg.sender, roundInfo.numberOfRound, combination);
     }
 
-    function endLottery() public onlyOwner {
-        require(lotteryState == LOTTERY_STATE.OPEN, 'Can\'t end!');
-        lotteryState = LOTTERY_STATE.CALCULATING_WINNER;
+    function endRound() public onlyOwner {
+        require(lotteryState == LOTTERY_STATE.STARTED, 'Can\'t end!');
+        require(block.timestamp > roundInfo.timeStarted + 600, 'Lottery has not ended.');
+        lotteryState = LOTTERY_STATE.CALCULATING;
         lastRequestId = requestRandomNumber();
-    }
-
-    function requestRandomNumber() private onlyOwner returns (uint256 requestId) {
-        // Will revert if subscription is not set and funded.
-        requestId = COORDINATOR.requestRandomWords(
-            keyHash,
-            s_subscriptionId,
-            uint16(3),          // requestConfirmations
-            callbackGasLimit,
-            uint32(1)           // numWords
-        );
-        emit RequestSent(requestId);
-        return requestId;
-    }
-
-    function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override {
-        require(lotteryState == LOTTERY_STATE.CALCULATING_WINNER);
-        require(lastRequestId == requestId);
-        lastVerifiedRandomNumber = randomWords[0];
-        emit RequestFulfilled(requestId);
     }
 
     // TODO: Automation
     function drawNumbers(uint256 randomNumber) private {
-        require(lotteryState == LOTTERY_STATE.CALCULATING_WINNER, 'Lottery has not ended.');
+        require(lotteryState == LOTTERY_STATE.DRAWING_NUMBERS, 'Randomness not fulfilled.');
 
         // Generate numbers 1-48
         uint256[48] memory allNumbers;
@@ -129,10 +124,10 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable {
 
         // Undo last shifting and save result
         result >>= 6;
-        drawnNumbers[numOfRound] = result;
+        drawnNumbers[roundInfo.numberOfRound] = result;
 
         lotteryState = LOTTERY_STATE.CLOSED;
-        emit LotteryEnded(numOfRound);
+        emit RoundEnded(roundInfo.numberOfRound);
     }
 
     function checkIfValid(uint256[6] memory combination) private pure returns (bool) {
@@ -197,6 +192,51 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable {
         return (counter == 6 ? uint256(index) : 100);
     }
 
+    // =============================================================
+    //                         CHAINLINK
+    // =============================================================
+
+    function requestRandomNumber() private onlyOwner returns (uint256 requestId) {
+        // Will revert if subscription is not set and funded.
+        requestId = COORDINATOR.requestRandomWords(
+            keyHash,
+            s_subscriptionId,
+            uint16(3),          // requestConfirmations
+            callbackGasLimit,
+            uint32(1)           // numWords
+        );
+        emit RequestForRandomNumberSent(requestId);
+        return requestId;
+    }
+
+    function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override {
+        require(lotteryState == LOTTERY_STATE.CALCULATING);
+        require(lastRequestId == requestId);
+        lotteryState = LOTTERY_STATE.DRAWING_NUMBERS;
+        lastVerifiedRandomNumber = randomWords[0];
+        emit RandomNumberFulfilled(requestId);
+    }
+
+    function checkUpkeep(bytes calldata checkData)
+    external
+    view
+    override
+    returns(bool upkeepNeeded, bytes memory performData) {
+
+    }
+
+    function performUpkeep(bytes calldata performData) external override {
+        require(msg.sender == keeperAddress);
+    }
+
+    function setKeeperAddress(address newAddress) external onlyOwner {
+        keeperAddress = newAddress;
+    }
+
+    // =============================================================
+    //                            OTHER
+    // =============================================================
+
     function platformBalance() public view returns (uint256) {
         return address(this).balance - ownerBalance;
     }
@@ -217,7 +257,7 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable {
 
     // TODO: For local testing
     function endLotteryForLocalTesting() public {
-        lotteryState = LOTTERY_STATE.CALCULATING_WINNER;
+        lotteryState = LOTTERY_STATE.DRAWING_NUMBERS;
         drawNumbers(69);
     }
 }

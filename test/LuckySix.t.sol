@@ -16,25 +16,24 @@ contract LuckySixTest is Test, ILuckySix {
     receive() payable external {}
 
     function setUp() public {
-        luckySixContract = new LuckySix(0, address(this));
+        luckySixContract = new LuckySix(0, address(this), address(this));
         platformFee = luckySixContract.platformFee();
     }
 
-    function testStartLottery() public {
+    function testOpenRound() public {
         vm.expectEmit(true, true, true, true, address(luckySixContract));
-        emit LotteryStarted(1);
-
-        luckySixContract.startLottery();	
+        emit RoundStarted(1);
+        luckySixContract.openRound();	
     }
 
-    function testEnterLottery(uint256[6] memory input) public {
+    function testPlayTicket(uint256[6] memory input) public {
         vm.assume(input[0] > 0);
         vm.assume(input[1] > 1000);
         vm.assume(input[2] > 1000000);
         vm.assume(input[3] > 1000000000);
         vm.assume(input[4] > 1000000000000);
 
-        testStartLottery();
+        testOpenRound();
         uint256[6] memory combination = [
             uint256(input[0] % 8 + 1),
             input[1] % 8 + 1 * 8 + 1,
@@ -45,22 +44,24 @@ contract LuckySixTest is Test, ILuckySix {
         ];
 
         vm.expectEmit(true, true, true, true, address(luckySixContract));
+		emit CountdownStarted(1);
+        vm.expectEmit(true, true, true, true, address(luckySixContract));
         emit TicketBought(address(this), 1, combination);
-        luckySixContract.enterLottery{ value: ticketBet }(combination);
+        luckySixContract.playTicket{ value: ticketBet }(combination);
 
         combination[0] = 0;
         vm.expectRevert(bytes('Not valid combination.'));
-        luckySixContract.enterLottery(combination);
+        luckySixContract.playTicket(combination);
     }
 
     function testDrawNumbers() public {
-        luckySixContract.startLottery();
-        luckySixContract.enterLottery{ value: ticketBet }([uint256(1), 2, 3, 4, 5, 6]);
-        luckySixContract.enterLottery{ value: ticketBet }([uint256(1), 11, 21, 31, 41, 48]);
-        luckySixContract.enterLottery{ value: ticketBet }([uint256(16), 46, 22, 11, 3, 40]);
+        luckySixContract.openRound();
+        luckySixContract.playTicket{ value: ticketBet }([uint256(1), 2, 3, 4, 5, 6]);
+        luckySixContract.playTicket{ value: ticketBet }([uint256(1), 11, 21, 31, 41, 48]);
+        luckySixContract.playTicket{ value: ticketBet }([uint256(16), 46, 22, 11, 3, 40]);
 
         vm.expectEmit(true, true, true, true, address(luckySixContract));
-        emit LotteryEnded(1);
+        emit RoundEnded(1);
         luckySixContract.endLotteryForLocalTesting();
     }
 
