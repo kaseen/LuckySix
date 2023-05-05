@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity ^0.8.19;
 
 import { LuckySix } from 'src/LuckySix.sol';
@@ -44,7 +43,7 @@ contract LuckySixTest is Test, ILuckySix {
         ];
 
         vm.expectEmit(true, true, true, true, address(luckySixContract));
-		emit CountdownStarted(1);
+        emit CountdownStarted(1);
         vm.expectEmit(true, true, true, true, address(luckySixContract));
         emit TicketBought(address(this), 1, combination);
         luckySixContract.playTicket{ value: ticketBet }(combination);

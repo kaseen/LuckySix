@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity ^0.8.19;
 
 import '@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol';
@@ -8,11 +7,7 @@ import '@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol';
 import '@openzeppelin/contracts/access/Ownable.sol';
 import './interfaces/ILuckySix.sol';
 
-import 'forge-std/console.sol';
-
 // TODO: checkIfValid unique combination array memory[12] sort by middle (gas optimization)
-// TODO: play ticket for upcoming rounds
-
 contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatibleInterface {
 
     Round public roundInfo;
@@ -23,10 +18,12 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
     uint256 constant NUMBER_OF_DRAWS = 35;
     uint256 constant MASK_00111111 = 2 ** 6 - 1;
 
+    uint256 constant WAIT_BEFORE_ENDING = 600;
+
     // Chainlink 
     VRFCoordinatorV2Interface COORDINATOR;
     uint64 s_subscriptionId;
-    uint256 public lastRequestId;
+    uint256 private lastRequestId;
     bytes32 keyHash = 0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c;
     uint32 callbackGasLimit = 100000;
     address private keeperAddress;
@@ -39,6 +36,11 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
 
     // Keep track of drawn numbers for each round
     mapping(uint256 => uint256) public drawnNumbers;
+
+    modifier onlyKeeper {
+        require(msg.sender == keeperAddress, 'Caller is not keeper.');
+        _;
+    }
 
     uint256[] private bonusMultiplier = [
         0, 0, 0, 0, 0, 10000, 7500, 5000, 
@@ -60,7 +62,7 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
         roundInfo.isStarted = false;
     }
 
-    function openRound() public onlyOwner {
+    function openRound() public onlyKeeper {
         require(lotteryState == LOTTERY_STATE.CLOSED, 'Can\'t start!');
         lotteryState = LOTTERY_STATE.READY;
         roundInfo.isStarted = false;
@@ -85,14 +87,13 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
         emit TicketBought(msg.sender, roundInfo.numberOfRound, combination);
     }
 
-    function endRound() public onlyOwner {
+    function endRound() public onlyKeeper {
         require(lotteryState == LOTTERY_STATE.STARTED, 'Can\'t end!');
-        require(block.timestamp > roundInfo.timeStarted + 600, 'Lottery has not ended.');
+        require(block.timestamp > roundInfo.timeStarted + WAIT_BEFORE_ENDING, 'Lottery has not ended.');
         lotteryState = LOTTERY_STATE.CALCULATING;
         lastRequestId = requestRandomNumber();
     }
 
-    // TODO: Automation
     function drawNumbers(uint256 randomNumber) private {
         require(lotteryState == LOTTERY_STATE.DRAWING_NUMBERS, 'Randomness not fulfilled.');
 
@@ -157,6 +158,7 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
 
     function getPayoutForTicket(uint256 round, uint256 indexOfTicket) public {
         require(players[msg.sender][round][indexOfTicket].bet > 0, 'Ticket already cashed out.');
+        require(round < roundInfo.numberOfRound, 'Invalid round number.');
 
         // Calculate index of last drawn number
         uint256 index = returnIndexOfLastDrawnNumber(round, players[msg.sender][round][indexOfTicket].combination);
@@ -196,7 +198,7 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
     //                         CHAINLINK
     // =============================================================
 
-    function requestRandomNumber() private onlyOwner returns (uint256 requestId) {
+    function requestRandomNumber() private onlyKeeper returns (uint256 requestId) {
         // Will revert if subscription is not set and funded.
         requestId = COORDINATOR.requestRandomWords(
             keyHash,
@@ -217,16 +219,28 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
         emit RandomNumberFulfilled(requestId);
     }
 
-    function checkUpkeep(bytes calldata checkData)
+    function checkUpkeep(bytes calldata /* checkData */)
     external
     view
     override
     returns(bool upkeepNeeded, bytes memory performData) {
-
+        upkeepNeeded = false; performData;
+        if(lotteryState == LOTTERY_STATE.CLOSED)
+            upkeepNeeded = true;
+        else if(lotteryState == LOTTERY_STATE.STARTED && (block.timestamp > roundInfo.timeStarted + WAIT_BEFORE_ENDING))
+            upkeepNeeded = true;
+        else if(lotteryState == LOTTERY_STATE.DRAWING_NUMBERS)
+            upkeepNeeded = true;
     }
 
-    function performUpkeep(bytes calldata performData) external override {
+    function performUpkeep(bytes calldata /* performData */) external override {
         require(msg.sender == keeperAddress);
+        if(lotteryState == LOTTERY_STATE.CLOSED)
+            openRound();
+        else if(lotteryState == LOTTERY_STATE.STARTED && (block.timestamp > roundInfo.timeStarted + WAIT_BEFORE_ENDING))
+            endRound();
+        else if(lotteryState == LOTTERY_STATE.DRAWING_NUMBERS)
+            drawNumbers(lastVerifiedRandomNumber);
     }
 
     function setKeeperAddress(address newAddress) external onlyOwner {
@@ -255,9 +269,11 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
         emit PlatformFeeChanged(amount);
     }
 
+    /*
     // TODO: For local testing
     function endLotteryForLocalTesting() public {
         lotteryState = LOTTERY_STATE.DRAWING_NUMBERS;
         drawNumbers(69);
     }
+    */
 }
