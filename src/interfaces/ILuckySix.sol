@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.22;
 
 interface ILuckySix {
 
     enum LOTTERY_STATE {
-        READY,
-        STARTED,
-        CALCULATING,
-        DRAWING_NUMBERS,
-        CLOSED
+        READY,                  // GameOpened
+        STARTED,                // GameStarted
+        CALCULATING,            // GameRequestRandomNumber
+        DRAWING_NUMBERS,        // GameRandomNumberFulfilled
+        CLOSED                  // GameRoundEnded
     }
 
     struct Round {
@@ -22,11 +22,12 @@ interface ILuckySix {
         uint256 bet;
     }
 
-    event RoundStarted(uint256 numOfRound);
-    event CountdownStarted(uint256 numOfRound);
-    event RequestForRandomNumberSent(uint256 requestId);
-    event RandomNumberFulfilled(uint256 requestId);
-    event RoundEnded(uint256 numOfRound);
+    event GameRoundOpened(uint256);
+    event GameStarted(uint256);
+    event GameRequestRandomNumber(uint256);
+    event GameRandomNumberFulfilled(uint256);
+    event GameRoundEnded(uint256);
+
     event TicketBought(address indexed player, uint256 numOfRound, uint256[6] combination);
     event TicketCashedOut(address indexed player, uint256 numOfRound, uint256 indexOfTicket, uint256 amount);
     event PlatformFeeChanged(uint256 newAmount);

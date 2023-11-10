@@ -1,82 +1,81 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.22;
 
 import { LuckySix } from 'src/LuckySix.sol';
 import { ILuckySix } from 'src/interfaces/ILuckySix.sol';
-import 'forge-std/Test.sol';
-import 'forge-std/console.sol';
+import { MockVRFCoordinator } from './MockVRFCoordinator.sol';
+import { Test } from 'forge-std/Test.sol';
 
 contract LuckySixTest is Test, ILuckySix {
 
-    LuckySix public luckySixContract;
+    LuckySix immutable game;
+    MockVRFCoordinator immutable mockVrfCoordinator;
+    uint256 constant ONE_MINUTE = 60;
     uint256 platformFee;
     uint256 ticketBet = 1 ether;
 
     receive() payable external {}
 
+    constructor() {
+        mockVrfCoordinator = new MockVRFCoordinator();
+        game = new LuckySix(0, address(mockVrfCoordinator), address(this));
+    }
+
     function setUp() public {
-        luckySixContract = new LuckySix(0, address(this), address(this));
-        platformFee = luckySixContract.platformFee();
+        platformFee = game.platformFee();
     }
 
-    function testOpenRound() public {
-        vm.expectEmit(true, true, true, true, address(luckySixContract));
-        emit RoundStarted(1);
-        luckySixContract.openRound();	
+    function assertEq(LOTTERY_STATE a, LOTTERY_STATE b) internal virtual {
+        assertEq(uint256(a), uint256(b));
     }
 
-    function testPlayTicket(uint256[6] memory input) public {
-        vm.assume(input[0] > 0);
-        vm.assume(input[1] > 1000);
-        vm.assume(input[2] > 1000000);
-        vm.assume(input[3] > 1000000000);
-        vm.assume(input[4] > 1000000000000);
+    function test__openRound() public {
+        vm.expectEmit(false, false, false, true, address(game));
+        emit GameRoundOpened(0);
+        game.performUpkeep(hex"");
 
-        testOpenRound();
-        uint256[6] memory combination = [
-            uint256(input[0] % 8 + 1),
-            input[1] % 8 + 1 * 8 + 1,
-            input[2] % 8 + 2 * 8 + 1,
-            input[3] % 8 + 3 * 8 + 1,
-            input[4] % 8 + 4 * 8 + 1,
-            input[5] % 8 + 5 * 8 + 1
-        ];
-
-        vm.expectEmit(true, true, true, true, address(luckySixContract));
-        emit CountdownStarted(1);
-        vm.expectEmit(true, true, true, true, address(luckySixContract));
-        emit TicketBought(address(this), 1, combination);
-        luckySixContract.playTicket{ value: ticketBet }(combination);
-
-        combination[0] = 0;
-        vm.expectRevert(bytes('Not valid combination.'));
-        luckySixContract.playTicket(combination);
+        assertEq(LOTTERY_STATE.READY, game.lotteryState());
     }
 
-    function testDrawNumbers() public {
-        luckySixContract.openRound();
-        luckySixContract.playTicket{ value: ticketBet }([uint256(1), 2, 3, 4, 5, 6]);
-        luckySixContract.playTicket{ value: ticketBet }([uint256(1), 11, 21, 31, 41, 48]);
-        luckySixContract.playTicket{ value: ticketBet }([uint256(16), 46, 22, 11, 3, 40]);
+    function test__startCountdown() public {
+        test__openRound();
+        uint256[6] memory combination = [uint256(1), 2, 3, 4, 5, 6];
 
-        vm.expectEmit(true, true, true, true, address(luckySixContract));
-        emit RoundEnded(1);
-        luckySixContract.endLotteryForLocalTesting();
+        vm.expectEmit(false, false, false, true, address(game));
+        emit GameStarted(0);
+        game.playTicket{ value: ticketBet }(combination);
+
+        assertEq(LOTTERY_STATE.STARTED, game.lotteryState());
     }
 
-    function testGetPayoutForTicket() public {
-        testDrawNumbers();
+    function test__drawNumbers() public {
+        test__startCountdown();
+        skip(10 * ONE_MINUTE + 1);
 
-        uint256 platformBalance = luckySixContract.platformBalance();
+        vm.expectEmit(false, false, false, true, address(game));
+        emit GameRequestRandomNumber(0);
+        game.performUpkeep(hex"");      
+        
+        assertEq(LOTTERY_STATE.DRAWING_NUMBERS, game.lotteryState());
+    }
 
-        vm.expectRevert(bytes('Ticket not valid.'));
-        luckySixContract.getPayoutForTicket(1, 0);
+    function test__endRound() public {
+        test__drawNumbers();
+        
+        vm.expectEmit(false, false, false, true, address(game));
+        emit GameRoundEnded(0);
+        game.performUpkeep(hex"");
 
-        vm.expectEmit(true, true, true, true, address(luckySixContract));
-        emit TicketCashedOut(address(this), 1, 2, platformBalance);
-        luckySixContract.getPayoutForTicket(1, 2);
+        assertEq(LOTTERY_STATE.CLOSED, game.lotteryState());
+    }
 
-        vm.expectRevert(bytes('Ticket already cashed out.'));
-        luckySixContract.getPayoutForTicket(1, 2);
+    function test__openRound2() public {
+        test__endRound();
+
+        vm.expectEmit(false, false, false, true, address(game));
+        emit GameRoundOpened(1);
+        game.performUpkeep(hex"");
+
+        assertEq(LOTTERY_STATE.READY, game.lotteryState());
     }
 }

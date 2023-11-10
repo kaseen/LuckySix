@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.22;
 
 import '@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol';
 import '@chainlink/contracts/src/v0.8/automation/AutomationCompatible.sol';
-import '@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol';
+import '@chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol';
 import '@openzeppelin/contracts/access/Ownable.sol';
 import './interfaces/ILuckySix.sol';
+
+import 'forge-std/console.sol';
 
 // TODO: checkIfValid unique combination array memory[12] sort by middle (gas optimization)
 contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatibleInterface {
@@ -53,7 +55,10 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
         uint64 subscriptionId,
         address vrfCoordinator,
         address keeperAddr
-    ) VRFConsumerBaseV2 (vrfCoordinator) {
+    )   
+    VRFConsumerBaseV2(vrfCoordinator) 
+    Ownable(msg.sender)
+    {
         COORDINATOR = VRFCoordinatorV2Interface(vrfCoordinator);
         s_subscriptionId = subscriptionId;
         keeperAddress = keeperAddr;
@@ -66,7 +71,7 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
         require(lotteryState == LOTTERY_STATE.CLOSED, 'Can\'t start!');
         lotteryState = LOTTERY_STATE.READY;
         roundInfo.isStarted = false;
-        emit RoundStarted(++roundInfo.numberOfRound);
+        emit GameRoundOpened(roundInfo.numberOfRound);
     }
 
     function playTicket(uint256[6] memory combination) public payable {
@@ -78,7 +83,7 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
             lotteryState = LOTTERY_STATE.STARTED;
             roundInfo.isStarted = true;
             roundInfo.timeStarted = block.timestamp;
-            emit CountdownStarted(roundInfo.numberOfRound);
+            emit GameStarted(roundInfo.numberOfRound);
         }
 
         players[msg.sender][roundInfo.numberOfRound].push(Ticket({ combination: combination, bet: msg.value - platformFee }));
@@ -128,7 +133,7 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
         drawnNumbers[roundInfo.numberOfRound] = result;
 
         lotteryState = LOTTERY_STATE.CLOSED;
-        emit RoundEnded(roundInfo.numberOfRound);
+        emit GameRoundEnded(roundInfo.numberOfRound++);
     }
 
     function checkIfValid(uint256[6] memory combination) private pure returns (bool) {
@@ -207,7 +212,7 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
             callbackGasLimit,
             uint32(1)           // numWords
         );
-        emit RequestForRandomNumberSent(requestId);
+        emit GameRequestRandomNumber(requestId);
         return requestId;
     }
 
@@ -216,7 +221,7 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
         require(lastRequestId == requestId);
         lotteryState = LOTTERY_STATE.DRAWING_NUMBERS;
         lastVerifiedRandomNumber = randomWords[0];
-        emit RandomNumberFulfilled(requestId);
+        emit GameRandomNumberFulfilled(requestId);
     }
 
     function checkUpkeep(bytes calldata /* checkData */)
@@ -234,6 +239,7 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
     }
 
     function performUpkeep(bytes calldata /* performData */) external override {
+        // TODO: raspakuj perform data
         require(msg.sender == keeperAddress);
         if(lotteryState == LOTTERY_STATE.CLOSED)
             openRound();
@@ -268,12 +274,4 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
         platformFee = amount;
         emit PlatformFeeChanged(amount);
     }
-
-    /*
-    // TODO: For local testing
-    function endLotteryForLocalTesting() public {
-        lotteryState = LOTTERY_STATE.DRAWING_NUMBERS;
-        drawNumbers(69);
-    }
-    */
 }
