@@ -56,7 +56,7 @@ contract LuckySixTest is Test, ILuckySix {
         emit GameRequestRandomNumber(0);
         game.performUpkeep(hex"");      
         
-        assertEq(LOTTERY_STATE.DRAWING_NUMBERS, game.lotteryState());
+        assertEq(LOTTERY_STATE.DRAWING, game.lotteryState());
     }
 
     function test__endRound() public {

@@ -7,7 +7,7 @@ interface ILuckySix {
         READY,                  // GameOpened
         STARTED,                // GameStarted
         CALCULATING,            // GameRequestRandomNumber
-        DRAWING_NUMBERS,        // GameRandomNumberFulfilled
+        DRAWING,                // GameRandomNumberFulfilled
         CLOSED                  // GameRoundEnded
     }
 
