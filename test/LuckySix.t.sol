@@ -10,7 +10,6 @@ contract LuckySixTest is Test, ILuckySix {
 
     LuckySix immutable game;
     MockVRFCoordinator immutable mockVrfCoordinator;
-    uint256 constant ONE_MINUTE = 60;
     uint256 platformFee;
     uint256 ticketBet = 1 ether;
 
@@ -39,10 +38,12 @@ contract LuckySixTest is Test, ILuckySix {
 
     function test__startCountdown() public {
         test__openRound();
-        uint256[6] memory combination = [uint256(1), 2, 3, 4, 5, 6];
+        uint256[6] memory combination = [uint256(3), 4, 5, 8, 9, 11];
 
         vm.expectEmit(false, false, false, true, address(game));
         emit GameStarted(0);
+        vm.expectEmit(true, false, false, true, address(game));
+        emit TicketBought(address(this), 0, combination);
         game.playTicket{ value: ticketBet }(combination);
 
         assertEq(LOTTERY_STATE.STARTED, game.lotteryState());
@@ -50,7 +51,7 @@ contract LuckySixTest is Test, ILuckySix {
 
     function test__drawNumbers() public {
         test__startCountdown();
-        skip(10 * ONE_MINUTE + 1);
+        skip(game.roundDuration() + 1);
 
         vm.expectEmit(false, false, false, true, address(game));
         emit GameRequestRandomNumber(0);
@@ -77,5 +78,13 @@ contract LuckySixTest is Test, ILuckySix {
         game.performUpkeep(hex"");
 
         assertEq(LOTTERY_STATE.READY, game.lotteryState());
+    }
+
+    function test__getPayoutForTicket() public {
+        test__openRound2();
+
+        vm.expectEmit(true, false, false, true, address(game));
+        emit TicketCashedOut(address(this), 0, 0, 990000000000000000);
+        game.getPayoutForTicket(0, 0);
     }
 }
