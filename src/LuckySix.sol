@@ -160,13 +160,15 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
     }
 
     function getPayoutForTicket(uint256 round, uint256 indexOfTicket) public {
-        if(players[msg.sender][round][indexOfTicket].bet == 0) revert TicketAlreadyCashed(round, indexOfTicket);
-        if(round >= roundInfo.numberOfRound) revert InvalidRoundNumber();
+        Ticket[] memory playerTickets = players[msg.sender][round];
+
+        if(indexOfTicket >= playerTickets.length) revert InvalidTicket(round, indexOfTicket);
+        if(playerTickets[indexOfTicket].bet == 0) revert TicketAlreadyCashed(round, indexOfTicket);
 
         // Calculate index of last drawn number
         uint256 index = returnIndexOfLastDrawnNumber(round, players[msg.sender][round][indexOfTicket].combination);
 
-        if(index >= NUMBER_OF_DRAWS) revert TicketNotValid(round, indexOfTicket);
+        if(index >= NUMBER_OF_DRAWS) revert TicketNotWinning(round, indexOfTicket);
         uint256 cashEarned = bonusMultiplier[index] * players[msg.sender][round][indexOfTicket].bet;
 
         // If platform doesn't have enought balance give all to winning player

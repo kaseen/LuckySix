@@ -41,7 +41,7 @@ interface ILuckySix {
     error UnauthorizedAccess();
     error NotValidCombination(uint256[6]);
     error NotEnoughFunds(uint256);
-    error InvalidRoundNumber();
+    error InvalidTicket(uint256, uint256);
     error TicketAlreadyCashed(uint256, uint256);
-    error TicketNotValid(uint256, uint256);
+    error TicketNotWinning(uint256, uint256);
 }
