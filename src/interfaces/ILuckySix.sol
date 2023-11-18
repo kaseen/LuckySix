@@ -31,4 +31,17 @@ interface ILuckySix {
     event TicketBought(address indexed player, uint256 numOfRound, uint256[6] combination);
     event TicketCashedOut(address indexed player, uint256 numOfRound, uint256 indexOfTicket, uint256 amount);
     event PlatformFeeChanged(uint256 newAmount);
+
+    error LotteryNotClosed();
+    error LotteryNotOpen();
+    error LotteryNotStarted();
+    error LotteryNotEnded();
+    error LotteryNotDrawn();
+    
+    error UnauthorizedAccess();
+    error NotValidCombination(uint256[6]);
+    error NotEnoughFunds(uint256);
+    error InvalidRoundNumber();
+    error TicketAlreadyCashed(uint256, uint256);
+    error TicketNotValid(uint256, uint256);
 }

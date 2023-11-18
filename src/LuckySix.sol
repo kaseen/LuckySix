@@ -37,7 +37,7 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
     mapping(uint256 => uint256) private drawnNumbers;
 
     modifier onlyKeeper {
-        require(msg.sender == keeperAddress, 'Caller is not keeper.');
+        if(msg.sender != keeperAddress) revert UnauthorizedAccess();
         _;
     }
 
@@ -65,16 +65,16 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
     }
 
     function openRound() public onlyKeeper {
-        require(lotteryState == LOTTERY_STATE.CLOSED, 'Can\'t start!');
+        if(lotteryState != LOTTERY_STATE.CLOSED) revert LotteryNotClosed();
         lotteryState = LOTTERY_STATE.READY;
         roundInfo.isStarted = false;
         emit GameRoundOpened(roundInfo.numberOfRound);
     }
 
     function playTicket(uint256[6] memory combination) public payable {
-        require(lotteryState == LOTTERY_STATE.READY || lotteryState == LOTTERY_STATE.STARTED, 'Lottery not open!');
-        require(checkIfValid(combination), 'Not valid combination.');
-        require(msg.value > platformFee, 'Not enough funds.');
+        if(lotteryState != LOTTERY_STATE.READY && lotteryState != LOTTERY_STATE.STARTED) revert LotteryNotOpen();
+        if(!checkIfValid(combination)) revert NotValidCombination(combination);
+        if(msg.value <= platformFee) revert NotEnoughFunds(msg.value);
 
         if(!roundInfo.isStarted){
             lotteryState = LOTTERY_STATE.STARTED;
@@ -90,14 +90,15 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
     }
 
     function endRound() public onlyKeeper {
-        require(lotteryState == LOTTERY_STATE.STARTED, 'Can\'t end!');
-        require(block.timestamp > roundInfo.timeStarted + roundDuration, 'Lottery has not ended.');
+        if(lotteryState != LOTTERY_STATE.STARTED) revert LotteryNotStarted();
+        if(block.timestamp <= roundInfo.timeStarted + roundDuration) revert LotteryNotEnded();
+
         lotteryState = LOTTERY_STATE.CALCULATING;
         lastRequestId = requestRandomNumber();
     }
 
     function drawNumbers(uint256 randomNumber) private {
-        require(lotteryState == LOTTERY_STATE.DRAWING, 'Randomness not fulfilled.');
+        if(lotteryState != LOTTERY_STATE.DRAWING) revert LotteryNotDrawn();
 
         // Generate numbers 1-48
         uint256[48] memory allNumbers;
@@ -159,13 +160,13 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
     }
 
     function getPayoutForTicket(uint256 round, uint256 indexOfTicket) public {
-        require(players[msg.sender][round][indexOfTicket].bet > 0, 'Ticket already cashed out.');
-        require(round < roundInfo.numberOfRound, 'Invalid round number.');
+        if(players[msg.sender][round][indexOfTicket].bet == 0) revert TicketAlreadyCashed(round, indexOfTicket);
+        if(round >= roundInfo.numberOfRound) revert InvalidRoundNumber();
 
         // Calculate index of last drawn number
         uint256 index = returnIndexOfLastDrawnNumber(round, players[msg.sender][round][indexOfTicket].combination);
 
-        require(index < (NUMBER_OF_DRAWS - 1), 'Ticket not valid.');
+        if(index >= NUMBER_OF_DRAWS) revert TicketNotValid(round, indexOfTicket);
         uint256 cashEarned = bonusMultiplier[index] * players[msg.sender][round][indexOfTicket].bet;
 
         // If platform doesn't have enought balance give all to winning player
@@ -235,9 +236,8 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
             upkeepNeeded = true;
     }
 
-    function performUpkeep(bytes calldata /* performData */) external override {
+    function performUpkeep(bytes calldata /* performData */) onlyKeeper external override {
         // TODO: raspakuj perform data
-        require(msg.sender == keeperAddress);
         if(lotteryState == LOTTERY_STATE.CLOSED)
             openRound();
         else if(lotteryState == LOTTERY_STATE.STARTED && (block.timestamp > roundInfo.timeStarted + roundDuration))
