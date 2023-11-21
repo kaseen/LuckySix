@@ -40,8 +40,8 @@ contract LuckySix is
     VRFCoordinatorV2Interface private COORDINATOR;
     uint64 private s_subscriptionId;
     uint256 private lastRequestId;
-    bytes32 private keyHash = 0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c;
-    uint32 private callbackGasLimit = 100000;
+    bytes32 private keyHash;
+    uint32 private callbackGasLimit;
     address private keeperAddress;
 
     // Mapping address to tickets played in specific round
@@ -62,6 +62,7 @@ contract LuckySix is
         _disableInitializers();
     }
 
+    // Constructor
     function initialize (
         uint64 subscriptionId,
         address vrfCoordinator,
@@ -83,6 +84,8 @@ contract LuckySix is
         lotteryState = LOTTERY_STATE.CLOSED;
 
         // Initial contract values
+        keyHash = 0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c;
+        callbackGasLimit = 100000;
         roundDuration = 600;
         platformFee = 0.01 ether;
         bonusMultiplier = [
