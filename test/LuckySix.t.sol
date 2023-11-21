@@ -1,28 +1,33 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import { LuckySix } from 'src/LuckySix.sol';
+import { LuckySix, UUPSProxy } from 'src/LuckySix.sol';
 import { ILuckySix } from 'src/interfaces/ILuckySix.sol';
 import { MockVRFCoordinator } from './MockVRFCoordinator.sol';
 import { Test } from 'forge-std/Test.sol';
 
 contract LuckySixTest is Test, ILuckySix {
 
-    LuckySix immutable game;
     MockVRFCoordinator immutable mockVrfCoordinator;
-    uint256 platformFee;
-    uint256 ticketBet = 1 ether;
+    LuckySix implementation;
+    LuckySix game;
+    UUPSProxy proxy;
 
-    receive() payable external {}
+    uint256 ticketBet = 1 ether;
 
     constructor() {
         mockVrfCoordinator = new MockVRFCoordinator();
-        game = new LuckySix(0, address(mockVrfCoordinator), address(this));
     }
 
     function setUp() public {
-        platformFee = game.platformFee();
+        implementation = new LuckySix();
+        proxy = new UUPSProxy(address(implementation), "");
+        game = LuckySix(address(proxy));
+        // Constructor
+        game.initialize(0, address(mockVrfCoordinator), address(this));
     }
+
+    receive() payable external {}
 
     function assertEq(LOTTERY_STATE a, LOTTERY_STATE b) internal virtual {
         assertEq(uint256(a), uint256(b));
@@ -114,7 +119,7 @@ contract LuckySixTest is Test, ILuckySix {
 
         // Expect emit when cashing out valid ticket
         vm.expectEmit(true, false, false, true, address(game));
-        emit TicketCashedOut(address(this), 0, 0, 2 ether - 2*platformFee);
+        emit TicketCashedOut(address(this), 0, 0, game.platformBalance());
         game.getPayoutForTicket(0, 0);
 
         // Expect revert when double cashing out the same ticket

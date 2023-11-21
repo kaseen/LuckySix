@@ -3,21 +3,38 @@ pragma solidity ^0.8.22;
 
 import '@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol';
 import '@chainlink/contracts/src/v0.8/automation/AutomationCompatible.sol';
-import '@chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol';
-import '@openzeppelin/contracts/access/Ownable.sol';
+import '@oz-upgradeable/proxy/utils/UUPSUpgradeable.sol';
+import '@oz-upgradeable/access/OwnableUpgradeable.sol';
+import '@oz-upgradeable/utils/PausableUpgradeable.sol';
+import "@oz/proxy/ERC1967/ERC1967Proxy.sol";
+import './VRFConsumerBaseV2Upgradeable.sol';
 import './interfaces/ILuckySix.sol';
 
-contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatibleInterface {
+contract UUPSProxy is ERC1967Proxy {
+    constructor(address _implementation, bytes memory _data)
+        ERC1967Proxy(_implementation, _data)
+    {}
+}
 
+contract LuckySix is 
+    ILuckySix,
+    UUPSUpgradeable,
+    PausableUpgradeable,
+    OwnableUpgradeable,
+    AutomationCompatibleInterface,
+    VRFConsumerBaseV2Upgradeable
+{
+    // Public variables, initialized in `initializator` function
+    uint256 public platformFee;
+    uint256 public roundDuration;               // TODO: DAO
     Round public roundInfo;
-    uint256 public platformFee = 0.01 ether;
+    LOTTERY_STATE public lotteryState;
+    
     uint256 private lastVerifiedRandomNumber;
     uint256 private ownerBalance;
 
     uint256 constant NUMBER_OF_DRAWS = 35;
     uint256 constant MASK_0b111111 = 2 ** 6 - 1;
-
-    uint256 public roundDuration = 600;     // TODO: DAO
 
     // Chainlink 
     VRFCoordinatorV2Interface private COORDINATOR;
@@ -26,9 +43,6 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
     bytes32 private keyHash = 0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c;
     uint32 private callbackGasLimit = 100000;
     address private keeperAddress;
-
-    // Keep track of current lotteryState
-    LOTTERY_STATE public lotteryState;
 
     // Mapping address to tickets played in specific round
     mapping(address => mapping(uint256 => Ticket[])) private players;
@@ -41,27 +55,42 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
         _;
     }
 
-    uint256[] public bonusMultiplier = [
-        0, 0, 0, 0, 0, 10000, 7500, 5000, 
-        2500, 1000, 500, 300, 200, 150, 100, 
-        90, 80, 70, 60, 50, 40, 30, 25, 20, 
-        15, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1
-    ];
+    uint256[35] public bonusMultiplier;
 
-    constructor(
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize (
         uint64 subscriptionId,
         address vrfCoordinator,
         address keeperAddr
-    )   
-    VRFConsumerBaseV2(vrfCoordinator) 
-    Ownable(msg.sender)
+    ) 
+    public 
+    initializer
     {
+        // Constructor for upgradable extensions
+        __UUPSUpgradeable_init();
+        __Pausable_init();
+        __Ownable_init(msg.sender);
+        __VRFConsumerBaseV2Upgradeable_init(vrfCoordinator);
+
+        // Constructor body
         COORDINATOR = VRFCoordinatorV2Interface(vrfCoordinator);
         s_subscriptionId = subscriptionId;
         keeperAddress = keeperAddr;
         lotteryState = LOTTERY_STATE.CLOSED;
-        roundInfo.numberOfRound = 0;
-        roundInfo.isStarted = false;
+
+        // Initial contract values
+        roundDuration = 600;
+        platformFee = 0.01 ether;
+        bonusMultiplier = [
+            0, 0, 0, 0, 0, 10000, 7500, 5000, 
+            2500, 1000, 500, 300, 200, 150, 100, 
+            90, 80, 70, 60, 50, 40, 30, 25, 20, 
+            15, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1
+        ];
     }
 
     function openRound() public onlyKeeper {
@@ -277,4 +306,14 @@ contract LuckySix is ILuckySix, VRFConsumerBaseV2, Ownable, AutomationCompatible
     function setRoundDuration(uint256 newDuration) public onlyKeeper {
         roundDuration = newDuration;
     } 
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    function pause() public onlyOwner {
+        _pause();
+    }
+
+    function unpause() public onlyOwner {
+        _unpause();
+    }
 }
