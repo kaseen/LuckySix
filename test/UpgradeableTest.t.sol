@@ -39,7 +39,7 @@ contract UpgradeableTest is Test {
         gameV1.initialize(0, address(this), address(this));
     }
 
-    function test__BLA() public {
+    function test__Upgrade() public {
         LuckySixV2 implementationV2 = new LuckySixV2();
         gameV1.upgradeToAndCall(address(implementationV2), "");
 
@@ -47,7 +47,7 @@ contract UpgradeableTest is Test {
         gameV2 = LuckySixV2(address(proxy));
         gameV2.initialize(1234);
 
-        assertEq(gameV1.platformFee(), 0.01 ether);
+        assertEq(gameV2.platformFee(), 0.01 ether);
         assertEq(gameV2.getNewVariable(), 1234);
     }
 }
