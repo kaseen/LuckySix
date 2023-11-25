@@ -10,11 +10,14 @@ contract TicketTest is Test, ILuckySix {
 
     GameInitForTesting setup;
     LuckySix game;
-    uint256 ticketBet = 1 ether;
+    uint256 ticketBet;
+    uint256 WINNING_TICKET_MUTLIPLIER_INDEX = 4;
 
     function setUp() public {
         setup = (new GameInitForTesting){ value: 100 ether }();
         game = LuckySix(setup.game());
+
+        ticketBet = setup.ticketBet() - game.platformFee();
     }
 
     function test__playTicket() public {
@@ -47,36 +50,46 @@ contract TicketTest is Test, ILuckySix {
     }
 
     function test__getPayoutForTicket() public {
-        // Expect emit when cashing out valid ticket
+        uint256 ROUND_NUMBER = 0;
+        uint256 WINNING_TICKET_INDEX = 0;
+        uint256 NO_MATCHES_TICKET_INDEX = 1;
+        uint256 LOSING_TICKET_INDEX = 2;
+        uint256 invalidRoundNumber = 10000;
+        uint256 invalidTicketNumber = 10000;
+
+        // Expect emit when cashing out valid ticket with WINNING_TICKET_MUTLIPLIER_INDEX
         vm.expectEmit(true, false, false, true, address(game));
-        emit TicketCashedOut(address(setup), 0, 0, game.platformBalance());
-        setup.getPayoutForTicket(0, 0);
+        emit TicketCashedOut(address(setup), ROUND_NUMBER, WINNING_TICKET_INDEX, ticketBet * WINNING_TICKET_MUTLIPLIER_INDEX);
+        setup.getPayoutForTicket(ROUND_NUMBER, WINNING_TICKET_INDEX);
+
+        // Expect emit when cashing out ticket with 0 matches
+        vm.expectEmit(true, false, false, true, address(game));
+        emit TicketCashedOut(address(setup), ROUND_NUMBER, NO_MATCHES_TICKET_INDEX, ticketBet * 100);
+        setup.getPayoutForTicket(ROUND_NUMBER, NO_MATCHES_TICKET_INDEX);
 
         // Expect revert when double cashing out the same ticket
         vm.expectRevert(
-            abi.encodeWithSelector(TicketAlreadyCashed.selector, 0, 0)
+            abi.encodeWithSelector(TicketAlreadyCashed.selector, ROUND_NUMBER, WINNING_TICKET_INDEX)
         );
-        setup.getPayoutForTicket(0, 0);
+        setup.getPayoutForTicket(ROUND_NUMBER, WINNING_TICKET_INDEX);
 
         // Expect revert when passing invalid round number
-        uint256 invalidRoundNumber = 10000;
         vm.expectRevert(
-            abi.encodeWithSelector(InvalidTicket.selector, invalidRoundNumber, 0)
+            abi.encodeWithSelector(InvalidTicket.selector, invalidRoundNumber, WINNING_TICKET_INDEX)
         );
-        setup.getPayoutForTicket(invalidRoundNumber, 0);
+        setup.getPayoutForTicket(invalidRoundNumber, WINNING_TICKET_INDEX);
 
         // Expect revert when passing invalid ticket number
-        uint256 invalidTicketNumber = 10000;
         vm.expectRevert(
-            abi.encodeWithSelector(InvalidTicket.selector, 0, invalidTicketNumber)
+            abi.encodeWithSelector(InvalidTicket.selector, ROUND_NUMBER, invalidTicketNumber)
         );
-        setup.getPayoutForTicket(0, invalidTicketNumber);
+        setup.getPayoutForTicket(ROUND_NUMBER, invalidTicketNumber);
 
         // Expect revert when passing ticket that has not won
         vm.expectRevert(
-            abi.encodeWithSelector(TicketNotWinning.selector, 0, 1)
+            abi.encodeWithSelector(TicketNotWinning.selector, ROUND_NUMBER, LOSING_TICKET_INDEX)
         );
-        setup.getPayoutForTicket(0, 1);
+        setup.getPayoutForTicket(ROUND_NUMBER, LOSING_TICKET_INDEX);
     }
 
 }

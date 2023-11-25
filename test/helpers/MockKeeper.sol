@@ -6,7 +6,7 @@ import { LuckySix } from 'src/LuckySix.sol';
 contract MockKeeper {
 
     function performUpkeep(address game) public {
-        LuckySix(game).performUpkeep(hex"");
+        LuckySix(payable(game)).performUpkeep(hex"");
     }
 
 }

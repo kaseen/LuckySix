@@ -33,7 +33,7 @@ contract UpgradeableTest is Test {
         proxy = new UUPSProxy(address(implementationV1), "");
 
         // Wrap in ABI to support easier calls
-        gameV1 = LuckySix(address(proxy));
+        gameV1 = LuckySix(payable(address(proxy)));
 
         // Constructor
         gameV1.initialize(0, address(this), address(this));
@@ -44,7 +44,7 @@ contract UpgradeableTest is Test {
         gameV1.upgradeToAndCall(address(implementationV2), "");
 
         // Rewrap the proxy and initialize
-        gameV2 = LuckySixV2(address(proxy));
+        gameV2 = LuckySixV2(payable(address(proxy)));
         gameV2.initialize(1234);
 
         assertEq(gameV2.platformFee(), 0.01 ether);

@@ -192,16 +192,16 @@ contract LuckySix is
     }
 
     function getPayoutForTicket(uint256 round, uint256 indexOfTicket) public {
-        Ticket[] memory playerTickets = players[msg.sender][round];
+        Ticket[] storage playerTickets = players[msg.sender][round];
 
         if(indexOfTicket >= playerTickets.length) revert InvalidTicket(round, indexOfTicket);
         if(playerTickets[indexOfTicket].bet == 0) revert TicketAlreadyCashed(round, indexOfTicket);
 
-        // Calculate index of last drawn number
-        uint256 index = returnIndexOfLastDrawnNumber(round, players[msg.sender][round][indexOfTicket].combination);
+        // Calculate multiplier of last drawn number
+        uint256 multiplier = getMultiplier(round, playerTickets[indexOfTicket].combination);
 
-        if(index >= NUMBER_OF_DRAWS) revert TicketNotWinning(round, indexOfTicket);
-        uint256 cashEarned = bonusMultiplier[index] * players[msg.sender][round][indexOfTicket].bet;
+        if(multiplier == 0) revert TicketNotWinning(round, indexOfTicket);
+        uint256 cashEarned = multiplier * playerTickets[indexOfTicket].bet;
 
         // If platform doesn't have enought balance give all to winning player
         uint256 balance = platformBalance();
@@ -211,24 +211,30 @@ contract LuckySix is
         payable(msg.sender).transfer(cashEarned);
 
         // Ticket is invalid when bet equals 0
-        players[msg.sender][round][indexOfTicket].bet = 0;
+        playerTickets[indexOfTicket].bet = 0;
         emit TicketCashedOut(msg.sender, round, indexOfTicket, cashEarned);
     }
 
-    function returnIndexOfLastDrawnNumber(uint256 round, uint256[6] memory ticketNumbers) private view returns (uint256) {
+    function getMultiplier(uint256 round, uint256[6] memory ticketNumbers) private view returns (uint256) {
         uint256[] memory combination = unpackResultForRound(round);
         uint256 counter = 0;
         int256 index = -1;
 
-        for (uint256 i; i < ticketNumbers.length; ++i)
-            for (uint256 j; j < combination.length; ++j)
-                if (ticketNumbers[i] == combination[j]){
+        uint256 n = ticketNumbers.length;
+        uint256 m = combination.length;
+        for(uint256 i; i < n; ++i)
+            for(uint256 j; j < m; ++j)
+                if(ticketNumbers[i] == combination[j]){
                     counter++;
                     index = int256(j) > index ? int256(j) : index;
                 }
 
-        // Return anything more than NUMBER_OF_DRAWS-1 if not valid, return 100 for example
-        return (counter == 6 ? uint256(index) : 100);
+        if(counter == 0)
+            return 100;
+        else if(counter == 6)
+            return bonusMultiplier[uint256(index)];
+        else 
+            return 0;
     }
 
     // =============================================================
@@ -306,11 +312,9 @@ contract LuckySix is
         emit PlatformFeeChanged(amount);
     }
 
-    function setRoundDuration(uint256 newDuration) public onlyKeeper {
+    function setRoundDuration(uint256 newDuration) public onlyOwner {
         roundDuration = newDuration;
     } 
-
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     function pause() public onlyOwner {
         _pause();
@@ -319,4 +323,8 @@ contract LuckySix is
     function unpause() public onlyOwner {
         _unpause();
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    receive() payable external {}
 }
