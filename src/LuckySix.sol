@@ -25,12 +25,12 @@ contract LuckySix is
     VRFConsumerBaseV2Upgradeable
 {
     /**
-     * @dev Recorded numbers and jokers for each round are represented using the following
-     *      packing blueprint, where the rightmost bit is the least significant bit:
+     * @dev Recorded numbers and position of jokers for each round are represented using the
+     *      following packing blueprint, where the rightmost bit is the least significant bit:
      *
      * 255        246        240   210       204       198    6          0
      *  | -------- | -------- |     | ------- | ------- |     | -------- | 
-     *  |  joker1  |  joker2  |     | number1 | number2 |     | number35 |
+     *  |  j_pos1  |  j_pos2  |     | number1 | number2 |     | number35 |
      *  | -------- | -------- |     | ------- | ------- |     | -------- |
      *  |          |          | ... |         |         | ... |          |
      *  |  6 bits  |  6 bits  |     |  6bits  |  6bits  |     |  6 bits  |
@@ -164,52 +164,6 @@ contract LuckySix is
         return true;
     }
 
-    function getPayoutForTicket(uint256 round, uint256 indexOfTicket) public {
-        Ticket[] storage playerTickets = players[msg.sender][round];
-
-        if(indexOfTicket >= playerTickets.length) revert InvalidTicket(round, indexOfTicket);
-        if(playerTickets[indexOfTicket].bet == 0) revert TicketAlreadyCashed(round, indexOfTicket);
-
-        // Calculate multiplier of last drawn number
-        uint256 multiplier = getMultiplier(round, playerTickets[indexOfTicket].combination);
-
-        if(multiplier == 0) revert TicketNotWinning(round, indexOfTicket);
-        uint256 cashEarned = multiplier * playerTickets[indexOfTicket].bet;
-
-        // If platform doesn't have enought balance give all to winning player
-        uint256 balance = platformBalance();
-        if(cashEarned > balance)
-            cashEarned = balance;
-
-        payable(msg.sender).transfer(cashEarned);
-
-        // Ticket is invalid when bet equals 0
-        playerTickets[indexOfTicket].bet = 0;
-        emit TicketCashedOut(msg.sender, round, indexOfTicket, cashEarned);
-    }
-
-    function getMultiplier(uint256 round, uint256[6] memory ticketNumbers) private view returns (uint256) {
-        uint256[] memory combination = unpackResultForRound(round);
-        uint256 counter = 0;
-        int256 index = -1;
-
-        uint256 n = ticketNumbers.length;
-        uint256 m = combination.length;
-        for(uint256 i; i < n; ++i)
-            for(uint256 j; j < m; ++j)
-                if(ticketNumbers[i] == combination[j]){
-                    counter++;
-                    index = int256(j) > index ? int256(j) : index;
-                }
-
-        if(counter == 0)
-            return 100;
-        else if(counter == 6)
-            return bonusMultiplier[uint256(index)];
-        else 
-            return 0;
-    }
-
     // =============================================================
     //                        DRAWING NUMBERS
     // =============================================================
@@ -250,13 +204,27 @@ contract LuckySix is
 
     /**
      * @dev Positions for the joker are limited to 0 through `_NUMBER_OF_DRAWS - 5`
-     *      as winning combination is not possible in the initial 5 draws. Additionally,
-     *      the second joker can have one less position than the first one.
+     *      as a winning combination is not possible in the initial 5 draws. Furthermore,
+     *      it addresses the scenario where the joker positions have the same value.
      */
     function drawAndPackJockers(uint256[] memory randomNumbers) private pure returns (uint256 result) {
-        result |= randomNumbers[0] % (_NUMBER_OF_DRAWS - 5);
+        uint256 maximumJockerPosition = _NUMBER_OF_DRAWS - 5;
+
+        uint256 j_pos1 = randomNumbers[0] % maximumJockerPosition;
+        uint256 j_pos2 = randomNumbers[1] % maximumJockerPosition;
+
+        // Handle the case where the positions of the jokers are equal by reducing the value of the
+        // second one by half. If both jokers are at position 0, increment one of them.
+        if(j_pos1 == j_pos2){
+            if(j_pos2 == 0)
+                j_pos2 = 1;
+            else
+                j_pos2 /= 2;
+        }
+
+        result |= randomNumbers[0] % maximumJockerPosition;
         result <<= 6;
-        result |= randomNumbers[1] % (_NUMBER_OF_DRAWS - 6);
+        result |= randomNumbers[1] % maximumJockerPosition;
     }
 
     /**
@@ -291,10 +259,10 @@ contract LuckySix is
     function unpackJockersForRound(uint256 n) public view returns (uint256, uint256) {
         uint256 packedResult = packedJokersAndNumbersForRound[n] >> _BITPOS_JOCKERS;
 
-        uint256 joker2 = packedResult & _BITMASK_0b111111;
-        uint256 joker1 = (packedResult >> 6) & _BITMASK_0b111111;
+        uint256 j_pos2 = packedResult & _BITMASK_0b111111;
+        uint256 j_pos1 = (packedResult >> 6) & _BITMASK_0b111111;
 
-        return (joker1, joker2);
+        return (j_pos1, j_pos2);
     }
 
     /**
@@ -311,6 +279,75 @@ contract LuckySix is
             result[tmp - i] = (packedResult >> i * 6) & _BITMASK_0b111111;
 
         return result;
+    }
+
+    // =============================================================
+    //                     PAYOUT FOR THE TICKET
+    // =============================================================
+
+    /**
+     * @dev A function that calculates the earnings of a given ticket by finding the index of the last 
+     *      drawn number and the number of jokers. If the platform doesn't have enough funds it awards
+     *      everything to the winner.
+     */
+    function getPayoutForTicket(uint256 round, uint256 indexOfTicket) public {
+        Ticket[] storage playerTickets = players[msg.sender][round];
+
+        if(indexOfTicket >= playerTickets.length) revert InvalidTicket(round, indexOfTicket);
+        if(playerTickets[indexOfTicket].bet == 0) revert TicketAlreadyCashed(round, indexOfTicket);
+
+        // Determine the multiplier for the last drawn number
+        uint256 multiplier = getMultiplier(round, playerTickets[indexOfTicket].combination);
+
+        if(multiplier == 0) revert TicketNotWinning(round, indexOfTicket);
+        uint256 cashEarned = multiplier * playerTickets[indexOfTicket].bet;
+
+        // If the platform lacks sufficient balance, send all to the winning player.
+        uint256 balance = platformBalance();
+        if(cashEarned > balance)
+            cashEarned = balance;
+
+        payable(msg.sender).transfer(cashEarned);
+
+        // The ticket becomes invalid if the bet is set to 0
+        playerTickets[indexOfTicket].bet = 0;
+        emit TicketCashedOut(msg.sender, round, indexOfTicket, cashEarned);
+    }
+
+    /**
+     * @dev A function that determines the multiplier for the ticket bet by examining each number from
+     *      the ticket against the drawn numbers, while also checking if the drawn number shares the
+     *      same index as any of the joker positions.
+     */
+    function getMultiplier(uint256 round, uint256[6] memory ticketNumbers) private view returns (uint256) {
+        (uint256 j_pos1, uint256 j_pos2) = unpackJockersForRound(round);
+        uint256 jockersCounter;
+
+        uint256[] memory combination = unpackResultForRound(round);
+        uint256 numbersMatchedCounter;
+        int256 index = -1;
+
+        uint256 n = ticketNumbers.length;
+        uint256 m = combination.length;
+
+        // A nested loop where each number from the ticket is examined with all the drawn numbers.
+        for(uint256 i; i < n; ++i)
+            for(uint256 j; j < m; ++j)
+                if(ticketNumbers[i] == combination[j]){
+                    // If the drawn number shares the same position as the joker, increment the `jockersCounter` by one.
+                    if(j == j_pos1 || j == j_pos2)
+                        jockersCounter++;
+
+                    numbersMatchedCounter++;
+                    index = int256(j) > index ? int256(j) : index;
+                }
+
+        if(numbersMatchedCounter == 0)
+            return 100;
+        else if(numbersMatchedCounter == 6)
+            return bonusMultiplier[uint256(index)] * (2 ** jockersCounter);
+        else
+            return 0;
     }
 
     // =============================================================
