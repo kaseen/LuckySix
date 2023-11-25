@@ -13,7 +13,7 @@ interface ILuckySix {
 
     struct Round {
         uint256 numberOfRound;
-        uint256 timeStarted;
+        uint64 timeStarted;
         bool isStarted;
     }
 

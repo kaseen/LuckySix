@@ -6,7 +6,7 @@ import '@chainlink/contracts/src/v0.8/automation/AutomationCompatible.sol';
 import '@oz-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 import '@oz-upgradeable/access/OwnableUpgradeable.sol';
 import '@oz-upgradeable/utils/PausableUpgradeable.sol';
-import "@oz/proxy/ERC1967/ERC1967Proxy.sol";
+import '@oz/proxy/ERC1967/ERC1967Proxy.sol';
 import './VRFConsumerBaseV2Upgradeable.sol';
 import './interfaces/ILuckySix.sol';
 
@@ -24,17 +24,45 @@ contract LuckySix is
     AutomationCompatibleInterface,
     VRFConsumerBaseV2Upgradeable
 {
-    // Public variables, initialized in `initializator` function
+    /**
+     * @dev Recorded numbers and jokers for each round are represented using the following
+     *      packing blueprint, where the rightmost bit is the least significant bit:
+     *
+     * 255        246        240   210       204       198    6          0
+     *  | -------- | -------- |     | ------- | ------- |     | -------- | 
+     *  |  joker1  |  joker2  |     | number1 | number2 |     | number35 |
+     *  | -------- | -------- |     | ------- | ------- |     | -------- |
+     *  |          |          | ... |         |         | ... |          |
+     *  |  6 bits  |  6 bits  |     |  6bits  |  6bits  |     |  6 bits  |
+     *  | -------- | -------- |     | ------- | ------- |     | -------- |
+     */
+    mapping(uint256 => uint256) private packedJokersAndNumbersForRound;
+
+    // Associating addresses with tickets played in a specific round.
+    mapping(address => mapping(uint256 => Ticket[])) private players;
+
+    /**
+     * @dev Since the maximum number of 6-bit numbers that can be packed in 256bits is 42,
+     *      the limitation here is that the `_NUMBER_OF_DRAWS` and `_NUMBER_OF_JOCKERS`
+     *      can be 42. Also, the maximum number that can be packed in a 6-bit format is 63,
+     *      which serves as the upper limit for `_MAXIMUM_NUMBER_DRAWN`.
+     */
+    uint256 private constant _NUMBER_OF_DRAWS = 35;
+    uint256 private constant _NUMBER_OF_JOCKERS = 2;
+    uint256 private constant _MAXIMUM_NUMBER_DRAWN = 48;
+
+    uint256 private constant _BITPOS_JOCKERS = 246;
+    uint256 private constant _BITMASK_0b111111 = 2 ** 6 - 1;
+
+    // Public variables that are initialized within the `initializator` function
     uint256 public platformFee;
-    uint256 public roundDuration;               // TODO: DAO
+    uint256 public roundDuration;
     Round public roundInfo;
     LOTTERY_STATE public lotteryState;
+    uint256[35] public bonusMultiplier;
     
     uint256 private lastVerifiedRandomNumber;
     uint256 private ownerBalance;
-
-    uint256 constant NUMBER_OF_DRAWS = 35;
-    uint256 constant MASK_0b111111 = 2 ** 6 - 1;
 
     // Chainlink 
     VRFCoordinatorV2Interface private COORDINATOR;
@@ -44,21 +72,14 @@ contract LuckySix is
     uint32 private callbackGasLimit;
     address private keeperAddress;
 
-    // Mapping address to tickets played in specific round
-    mapping(address => mapping(uint256 => Ticket[])) private players;
-
-    // Keep track of drawn numbers for each round
-    mapping(uint256 => uint256) private drawnNumbers;
-
     modifier onlyKeeper {
         if(msg.sender != keeperAddress) revert UnauthorizedAccess();
         _;
     }
 
-    uint256[35] public bonusMultiplier;
-
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
+        require(_NUMBER_OF_DRAWS + _NUMBER_OF_JOCKERS < _MAXIMUM_NUMBER_DRAWN);
         _disableInitializers();
     }
 
@@ -110,8 +131,8 @@ contract LuckySix is
 
         if(!roundInfo.isStarted){
             lotteryState = LOTTERY_STATE.STARTED;
+            roundInfo.timeStarted = uint64(block.timestamp);
             roundInfo.isStarted = true;
-            roundInfo.timeStarted = block.timestamp;
             emit GameStarted(roundInfo.numberOfRound);
         }
 
@@ -129,43 +150,6 @@ contract LuckySix is
         lastRequestId = requestRandomNumber();
     }
 
-    function drawNumbers(uint256 randomNumber) private {
-        if(lotteryState != LOTTERY_STATE.DRAWING) revert LotteryNotDrawn();
-
-        // Generate numbers 1-48
-        uint256[48] memory allNumbers;
-        for(uint256 i; i < 48; ++i)
-            allNumbers[i] = i + 1;
-
-        // Get NUMBER_OF_DRAWS random numbers from verified random number
-        uint256[] memory randomNumbers = new uint256[](NUMBER_OF_DRAWS);
-        for (uint256 i; i < NUMBER_OF_DRAWS; ++i)
-            randomNumbers[i] = uint256(keccak256(abi.encode(block.timestamp, randomNumber, i)));
-
-        // Draw numbers
-        uint256 j = allNumbers.length - 1;
-        uint256 result;
-        for(uint256 i; i < NUMBER_OF_DRAWS; ++i){
-            uint256 indexOfChosenNumber = randomNumbers[i] % j;
-
-            // Swap drawn number to the end of array [0, j] and decrement j
-            uint256 tmp = allNumbers[j];
-            allNumbers[j] = allNumbers[indexOfChosenNumber];
-            allNumbers[indexOfChosenNumber] = tmp;
-
-            // Pack drawn number into result variable
-            result |= allNumbers[j--];
-            result <<= 6;
-        }
-
-        // Undo last shifting and save result
-        result >>= 6;
-        drawnNumbers[roundInfo.numberOfRound] = result;
-
-        lotteryState = LOTTERY_STATE.CLOSED;
-        emit GameRoundEnded(roundInfo.numberOfRound++);
-    }
-
     function checkIfValid(uint256[6] memory combination) private pure returns (bool) {
         for(uint256 i; i < combination.length; ++i) {
             // Check if number is between 1 and 48
@@ -178,17 +162,6 @@ contract LuckySix is
                     return false;
         }
         return true;
-    }
-
-    function unpackResultForRound(uint256 n) public view returns (uint256[] memory) {
-        uint256[] memory result = new uint256[](NUMBER_OF_DRAWS);
-        uint256 tmp = NUMBER_OF_DRAWS - 1;
-        uint256 packedResult = drawnNumbers[n];
-
-        for(uint256 i; i < NUMBER_OF_DRAWS; ++i)
-            result[tmp - i] = (packedResult >> i * 6) & MASK_0b111111;
-
-        return result;
     }
 
     function getPayoutForTicket(uint256 round, uint256 indexOfTicket) public {
@@ -238,6 +211,109 @@ contract LuckySix is
     }
 
     // =============================================================
+    //                        DRAWING NUMBERS
+    // =============================================================
+
+    /**
+     * @dev Generate random numbers by drawing jokers first, then drawing numbers, and
+     *      finally combine the results using bitwise operations to store the outcome
+     *      in a single variable.
+     */
+    function drawNumbers() private {
+        if(lotteryState != LOTTERY_STATE.DRAWING) revert LotteryNotDrawn();
+
+        // Variable that will hold a combination of packed drawn numbers and jockers 
+        uint256 drawnNumbersAndJokers;
+
+        uint256[] memory randomNumbers = generateRandomNumbers();
+
+        drawnNumbersAndJokers = drawAndPackJockers(randomNumbers) << _BITPOS_JOCKERS;
+        drawnNumbersAndJokers |= drawAndPackNumbers(randomNumbers);
+
+        packedJokersAndNumbersForRound[roundInfo.numberOfRound] = drawnNumbersAndJokers;
+
+        lotteryState = LOTTERY_STATE.CLOSED;
+        emit GameRoundEnded(roundInfo.numberOfRound++);
+    }
+
+    /**
+     * @dev Generating a set of `_NUMBER_OF_DRAWS + _NUMBER_OF_JOCKERS` random numbers
+     *      drawn from `lastVerifiedRandomNumber` to determine absolutely random positions
+     *      for both jokers and regular numbers.
+     */
+    function generateRandomNumbers() private view returns (uint256[] memory) {
+        uint256[] memory randomNumbers = new uint256[](_NUMBER_OF_DRAWS + _NUMBER_OF_JOCKERS);
+        for (uint256 i; i < _NUMBER_OF_DRAWS + _NUMBER_OF_JOCKERS; ++i)
+            randomNumbers[i] = uint256(keccak256(abi.encode(block.timestamp, lastVerifiedRandomNumber, i)));
+        return randomNumbers;
+    }
+
+    /**
+     * @dev Positions for the joker are limited to 0 through `_NUMBER_OF_DRAWS - 5`
+     *      as winning combination is not possible in the initial 5 draws. Additionally,
+     *      the second joker can have one less position than the first one.
+     */
+    function drawAndPackJockers(uint256[] memory randomNumbers) private pure returns (uint256 result) {
+        result |= randomNumbers[0] % (_NUMBER_OF_DRAWS - 5);
+        result <<= 6;
+        result |= randomNumbers[1] % (_NUMBER_OF_DRAWS - 6);
+    }
+
+    /**
+     * @dev Numbers are drawn independently of jokers, and the most recently drawn number is
+     *      located in the lowest bit of the `packedJokersAndNumbersForRound` map.
+     */
+    function drawAndPackNumbers(uint256[] memory randomNumbers) private pure returns (uint256 result) {
+        // Create a sequence of numbers from 1 to 48
+        uint256[_MAXIMUM_NUMBER_DRAWN] memory allNumbers;
+        for(uint256 i; i < _MAXIMUM_NUMBER_DRAWN; ++i)
+            allNumbers[i] = i + 1;
+
+        uint256 j = allNumbers.length - 1;
+        for(uint256 i = 2; i < _NUMBER_OF_DRAWS + 2; ++i){
+            uint256 indexOfChosenNumber = randomNumbers[i] % j;
+
+            // Move the selected number to the end of the array [0, j] and decrease the value of j
+            uint256 tmp = allNumbers[j];
+            allNumbers[j] = allNumbers[indexOfChosenNumber];
+            allNumbers[indexOfChosenNumber] = tmp;
+
+            // Pack the drawn number in the result variable
+            result |= allNumbers[j--];
+            result <<= 6;
+        }
+        result >>= 6;
+    }
+
+    /**
+     * @dev A function that unpacks drawn numbers for a given round and returns a tuple of jokers positions.
+     */
+    function unpackJockersForRound(uint256 n) public view returns (uint256, uint256) {
+        uint256 packedResult = packedJokersAndNumbersForRound[n] >> _BITPOS_JOCKERS;
+
+        uint256 joker2 = packedResult & _BITMASK_0b111111;
+        uint256 joker1 = (packedResult >> 6) & _BITMASK_0b111111;
+
+        return (joker1, joker2);
+    }
+
+    /**
+     * @dev A function that unpacks drawn numbers for a given round and returns the drawn numbers 
+     *      in the order they were drawn.
+     */
+    function unpackResultForRound(uint256 n) public view returns (uint256[] memory) {
+        uint256 packedResult = packedJokersAndNumbersForRound[n];
+
+        uint256[] memory result = new uint256[](_NUMBER_OF_DRAWS);
+        uint256 tmp = _NUMBER_OF_DRAWS - 1;
+
+        for(uint256 i; i < _NUMBER_OF_DRAWS; ++i)
+            result[tmp - i] = (packedResult >> i * 6) & _BITMASK_0b111111;
+
+        return result;
+    }
+
+    // =============================================================
     //                         CHAINLINK
     // =============================================================
 
@@ -283,7 +359,7 @@ contract LuckySix is
         else if(lotteryState == LOTTERY_STATE.STARTED && (block.timestamp > roundInfo.timeStarted + roundDuration))
             endRound();
         else if(lotteryState == LOTTERY_STATE.DRAWING)
-            drawNumbers(lastVerifiedRandomNumber);
+            drawNumbers();
     }
 
     function setKeeperAddress(address newAddress) external onlyOwner {

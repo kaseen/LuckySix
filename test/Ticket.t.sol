@@ -11,7 +11,6 @@ contract TicketTest is Test, ILuckySix {
     GameInitForTesting setup;
     LuckySix game;
     uint256 ticketBet;
-    uint256 WINNING_TICKET_MUTLIPLIER_INDEX = 4;
 
     function setUp() public {
         setup = (new GameInitForTesting){ value: 100 ether }();
@@ -54,6 +53,7 @@ contract TicketTest is Test, ILuckySix {
         uint256 WINNING_TICKET_INDEX = 0;
         uint256 NO_MATCHES_TICKET_INDEX = 1;
         uint256 LOSING_TICKET_INDEX = 2;
+        uint256 WINNING_TICKET_MUTLIPLIER_INDEX = 6;
         uint256 invalidRoundNumber = 10000;
         uint256 invalidTicketNumber = 10000;
 

@@ -39,8 +39,8 @@ contract GameInitForTesting is Test {
 
     function initGame() public {
         keeperPerform();    // READY
-        game.playTicket{ value: ticketBet }([uint256(2), 3, 4, 5, 7, 8]);       // winning combination
-        game.playTicket{ value: ticketBet }([uint256(1), 6, 14, 15, 18, 20]);   // combination with 0 matches
+        game.playTicket{ value: ticketBet }([uint256(2), 5, 6, 7, 8, 9]);       // winning combination
+        game.playTicket{ value: ticketBet }([uint256(1), 4, 10, 15, 16, 20]);   // combination with 0 matches
         game.playTicket{ value: ticketBet }([uint256(1), 2, 3, 4, 5, 6]);       // losing combination
         skip(game.roundDuration() + 1);
         keeperPerform();    // DRAWING
