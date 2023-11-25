@@ -20,7 +20,7 @@ contract TicketTest is Test, ILuckySix {
     }
 
     function test__playTicket() public {
-        uint256[6] memory combination = [uint256(1), 2, 3, 4, 5, 49]; 
+        uint8[6] memory combination = [1, 2, 3, 4, 5, 49]; 
 
         // Expect `LotteryNotOpen` when lottery has not started
         vm.expectRevert(abi.encodeWithSelector(LotteryNotOpen.selector));

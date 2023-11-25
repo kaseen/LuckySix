@@ -18,8 +18,9 @@ interface ILuckySix {
     }
 
     struct Ticket {
-        uint256[6] combination;
         uint256 bet;
+        uint8[6] combination;
+        bool redeemed;
     }
 
     event GameRoundOpened(uint256);
@@ -28,7 +29,7 @@ interface ILuckySix {
     event GameRandomNumberFulfilled(uint256);
     event GameRoundEnded(uint256);
 
-    event TicketBought(address indexed player, uint256 numOfRound, uint256[6] combination);
+    event TicketBought(address indexed player, uint256 numOfRound, uint8[6] combination);
     event TicketCashedOut(address indexed player, uint256 numOfRound, uint256 indexOfTicket, uint256 amount);
     event PlatformFeeChanged(uint256 newAmount);
 
@@ -39,7 +40,7 @@ interface ILuckySix {
     error LotteryNotDrawn();
     
     error UnauthorizedAccess();
-    error NotValidCombination(uint256[6]);
+    error NotValidCombination(uint8[6]);
     error NotEnoughFunds(uint256);
     error InvalidTicket(uint256, uint256);
     error TicketAlreadyCashed(uint256, uint256);

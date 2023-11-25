@@ -38,7 +38,7 @@ contract LuckySix is
      */
     mapping(uint256 => uint256) private packedJokersAndNumbersForRound;
 
-    // Associating addresses with tickets played in a specific round.
+    // Associating addresses with tickets played in a specific round
     mapping(address => mapping(uint256 => Ticket[])) private players;
 
     /**
@@ -140,11 +140,12 @@ contract LuckySix is
      * @dev A function that plays the ticket of `msg.sender` with a given `combination`, where `msg.value`
      *      must be at least the `platformFee` value.
      */
-    function playTicket(uint256[6] memory combination) public payable {
+    function playTicket(uint8[6] memory combination) public payable {
         if(lotteryState != LOTTERY_STATE.READY && lotteryState != LOTTERY_STATE.STARTED) revert LotteryNotOpen();
         if(!checkIfValid(combination)) revert NotValidCombination(combination);
         if(msg.value <= platformFee) revert NotEnoughFunds(msg.value);
 
+        // If there are no tickets played before this one in the current round, initiate the game countdown
         if(!roundInfo.isStarted){
             lotteryState = LOTTERY_STATE.STARTED;
             roundInfo.timeStarted = uint64(block.timestamp);
@@ -152,7 +153,12 @@ contract LuckySix is
             emit GameStarted(roundInfo.numberOfRound);
         }
 
-        players[msg.sender][roundInfo.numberOfRound].push(Ticket({ combination: combination, bet: msg.value - platformFee }));
+        // Append ticket of `msg.sender` to `players` mapping for given round
+        players[msg.sender][roundInfo.numberOfRound].push(Ticket({ 
+            combination: combination,
+            bet: msg.value - platformFee,
+            redeemed: false
+        }));
         ownerBalance += platformFee;
 
         emit TicketBought(msg.sender, roundInfo.numberOfRound, combination);
@@ -161,7 +167,7 @@ contract LuckySix is
     /**
      * @dev A function that verifies whether the given `combination` contains valid and unique numbers.
      */
-    function checkIfValid(uint256[6] memory combination) private pure returns (bool) {
+    function checkIfValid(uint8[6] memory combination) private pure returns (bool) {
         for(uint256 i; i < combination.length; ++i) {
             // Check if number is between 1 and `_MAXIMUM_NUMBER_DRAWN`
             if(combination[i] < 1 || combination[i] > _MAXIMUM_NUMBER_DRAWN)
@@ -305,7 +311,7 @@ contract LuckySix is
         Ticket[] storage playerTickets = players[msg.sender][round];
 
         if(indexOfTicket >= playerTickets.length) revert InvalidTicket(round, indexOfTicket);
-        if(playerTickets[indexOfTicket].bet == 0) revert TicketAlreadyCashed(round, indexOfTicket);
+        if(playerTickets[indexOfTicket].redeemed) revert TicketAlreadyCashed(round, indexOfTicket);
 
         // Determine the multiplier for the last drawn number
         uint256 multiplier = getMultiplier(round, playerTickets[indexOfTicket].combination);
@@ -319,9 +325,8 @@ contract LuckySix is
             cashEarned = balance;
 
         payable(msg.sender).transfer(cashEarned);
-
-        // The ticket becomes invalid if the bet is set to 0
-        playerTickets[indexOfTicket].bet = 0;
+        playerTickets[indexOfTicket].redeemed = true;
+        
         emit TicketCashedOut(msg.sender, round, indexOfTicket, cashEarned);
     }
 
@@ -330,7 +335,7 @@ contract LuckySix is
      *      the ticket against the drawn numbers, while also checking if the drawn number shares the
      *      same index as any of the joker positions.
      */
-    function getMultiplier(uint256 round, uint256[6] memory ticketNumbers) private view returns (uint256) {
+    function getMultiplier(uint256 round, uint8[6] memory ticketNumbers) private view returns (uint256) {
         (uint256 j_pos1, uint256 j_pos2) = unpackJockersForRound(round);
         uint256 jockersCounter;
 

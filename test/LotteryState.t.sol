@@ -31,8 +31,8 @@ contract LotteryStateTest is Test, ILuckySix {
 
     function test__startCountdown() public {
         test__openRound();
-        uint256[6] memory winningCombination = [uint256(3), 4, 5, 8, 9, 10];
-        uint256[6] memory losingCombination = [uint256(3), 4, 5, 8, 9, 14];
+        uint8[6] memory winningCombination = [3, 4, 5, 8, 9, 10];
+        uint8[6] memory losingCombination = [3, 4, 5, 8, 9, 14];
 
         vm.expectEmit(false, false, false, true, address(game));
         emit GameStarted(1);
