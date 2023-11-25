@@ -124,6 +124,22 @@ contract LuckySix is
         emit GameRoundOpened(roundInfo.numberOfRound);
     }
 
+    function endRound() public onlyKeeper {
+        if(lotteryState != LOTTERY_STATE.STARTED) revert LotteryNotStarted();
+        if(block.timestamp <= roundInfo.timeStarted + roundDuration) revert LotteryNotEnded();
+
+        lotteryState = LOTTERY_STATE.CALCULATING;
+        lastRequestId = requestRandomNumber();
+    }
+
+    // =============================================================
+    //                        TICKET PLAYING
+    // =============================================================
+
+    /**
+     * @dev A function that plays the ticket of `msg.sender` with a given `combination`, where `msg.value`
+     *      must be at least the `platformFee` value.
+     */
     function playTicket(uint256[6] memory combination) public payable {
         if(lotteryState != LOTTERY_STATE.READY && lotteryState != LOTTERY_STATE.STARTED) revert LotteryNotOpen();
         if(!checkIfValid(combination)) revert NotValidCombination(combination);
@@ -142,18 +158,13 @@ contract LuckySix is
         emit TicketBought(msg.sender, roundInfo.numberOfRound, combination);
     }
 
-    function endRound() public onlyKeeper {
-        if(lotteryState != LOTTERY_STATE.STARTED) revert LotteryNotStarted();
-        if(block.timestamp <= roundInfo.timeStarted + roundDuration) revert LotteryNotEnded();
-
-        lotteryState = LOTTERY_STATE.CALCULATING;
-        lastRequestId = requestRandomNumber();
-    }
-
+    /**
+     * @dev A function that verifies whether the given `combination` contains valid and unique numbers.
+     */
     function checkIfValid(uint256[6] memory combination) private pure returns (bool) {
         for(uint256 i; i < combination.length; ++i) {
-            // Check if number is between 1 and 48
-            if(combination[i] < 1 || combination[i] > 48)
+            // Check if number is between 1 and `_MAXIMUM_NUMBER_DRAWN`
+            if(combination[i] < 1 || combination[i] > _MAXIMUM_NUMBER_DRAWN)
                 return false;
 
             // Check if number is unique
@@ -232,7 +243,7 @@ contract LuckySix is
      *      located in the lowest bit of the `packedJokersAndNumbersForRound` map.
      */
     function drawAndPackNumbers(uint256[] memory randomNumbers) private pure returns (uint256 result) {
-        // Create a sequence of numbers from 1 to 48
+        // Create a sequence of numbers from 1 to `_MAXIMUM_NUMBER_DRAWN`
         uint256[_MAXIMUM_NUMBER_DRAWN] memory allNumbers;
         for(uint256 i; i < _MAXIMUM_NUMBER_DRAWN; ++i)
             allNumbers[i] = i + 1;
