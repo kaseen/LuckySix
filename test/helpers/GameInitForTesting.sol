@@ -17,6 +17,10 @@ contract GameInitForTesting is Test {
 
     uint256 public ticketBet = 0.1 ether;
 
+    bytes4 public openRoundSelector = 0xe562dfd9;
+    bytes4 public endRoundSelector = 0x749aa2d9;
+    bytes4 public drawNumbersSelector = 0x676c902f;
+
     constructor() payable {
         mockVrfCoordinator = new MockVRFCoordinator();
         mockKeeper = new MockKeeper();
@@ -38,18 +42,22 @@ contract GameInitForTesting is Test {
     }
 
     function initGame() public {
-        keeperPerform();    // READY
+        keeperPerform(openRoundSelector);       // READY
         game.playTicket{ value: ticketBet }([5, 6, 7, 8, 9, 18]);       // winning combination with index 6
         game.playTicket{ value: ticketBet }([2, 5, 6, 7, 29, 30]);      // combination with 2 jokers
         game.playTicket{ value: ticketBet }([1, 4, 10, 15, 16, 20]);    // combination with 0 matches
         game.playTicket{ value: ticketBet }([1, 2, 3, 4, 5, 6]);        // losing combination
         skip(game.roundDuration() + 1);
-        keeperPerform();    // DRAWING
-        keeperPerform();    // CLOSED
+        keeperPerform(endRoundSelector);        // DRAWING
+        keeperPerform(drawNumbersSelector);     // CLOSED
     }
 
-    function keeperPerform() public {
-        mockKeeper.performUpkeep(address(game));
+    function keeperCheck() public view {
+        mockKeeper.checkUpkeep(address(game));
+    }
+
+    function keeperPerform(bytes4 selector) public {
+        mockKeeper.performUpkeep(address(game), selector);
     }
 
     function getPayoutForTicket(uint256 round, uint256 index) public {

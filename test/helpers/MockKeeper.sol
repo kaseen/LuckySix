@@ -5,8 +5,12 @@ import { LuckySix } from 'src/LuckySix.sol';
 
 contract MockKeeper {
 
-    function performUpkeep(address game) public {
-        LuckySix(payable(game)).performUpkeep(hex"");
+    function checkUpkeep(address game) public view {
+        LuckySix(payable(game)).checkUpkeep(hex"");
+    }
+
+    function performUpkeep(address game, bytes4 selector) public {
+        LuckySix(payable(game)).performUpkeep(abi.encode(bytes4(selector)));
     }
 
 }

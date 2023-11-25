@@ -26,7 +26,7 @@ contract TicketTest is Test, ILuckySix {
         vm.expectRevert(abi.encodeWithSelector(LotteryNotOpen.selector));
         game.playTicket{ value: ticketBet }(combination);
 
-        setup.keeperPerform();
+        setup.keeperPerform(setup.openRoundSelector());
 
         // Expect `NotValidCombination` on invalid combination
         vm.expectRevert(

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import '@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol';
-import '@chainlink/contracts/src/v0.8/automation/AutomationCompatible.sol';
+import '@chainlink/interfaces/VRFCoordinatorV2Interface.sol';
+import '@chainlink/automation/AutomationCompatible.sol';
 import '@oz-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 import '@oz-upgradeable/access/OwnableUpgradeable.sol';
 import '@oz-upgradeable/utils/PausableUpgradeable.sol';
@@ -186,11 +186,11 @@ contract LuckySix is
     // =============================================================
 
     /**
-     * @dev Generate random numbers by drawing jokers first, then drawing numbers, and
-     *      finally combine the results using bitwise operations to store the outcome
-     *      in a single variable.
+     * @dev    Generate random numbers by drawing jokers first, then drawing numbers, and
+     *         finally combine the results using bitwise operations to store the outcome
+     *         in a single variable. Only keeper address can perform this function.
      */
-    function drawNumbers() private {
+    function drawNumbers() public onlyKeeper {
         if(lotteryState != LOTTERY_STATE.DRAWING) revert LotteryNotDrawn();
 
         // Variable that will hold a combination of packed drawn numbers and jockers 
@@ -391,30 +391,43 @@ contract LuckySix is
         emit GameRandomNumberFulfilled(requestId);
     }
 
+    /**
+     * @dev This function is a `Chainlink` method that check keepers to determine if any work
+     *      needs to be performed based on the current lottery state. 
+     */
     function checkUpkeep(bytes calldata /* checkData */)
     external
     view
     override
     returns(bool upkeepNeeded, bytes memory performData) {
-        upkeepNeeded = false; performData;
+        upkeepNeeded = false;
         if(lotteryState == LOTTERY_STATE.CLOSED)
-            upkeepNeeded = true;
+            return (true, abi.encode(this.openRound.selector));
         else if(lotteryState == LOTTERY_STATE.STARTED && (block.timestamp > roundInfo.timeStarted + roundDuration))
-            upkeepNeeded = true;
+            return (true, abi.encode(this.endRound.selector));
         else if(lotteryState == LOTTERY_STATE.DRAWING)
-            upkeepNeeded = true;
+            return (true, abi.encode(this.drawNumbers.selector));
     }
 
-    function performUpkeep(bytes calldata /* performData */) onlyKeeper external override {
-        // TODO: raspakuj perform data
-        if(lotteryState == LOTTERY_STATE.CLOSED)
+    /**
+     * @dev This function is a `Chainlink` method that is executed by the keepers. The data returned
+     *      by the checkUpkeep simulation will be passed into this method to be actually executed.
+     *      Only the keeper's address is allowed to call this function.
+     */
+    function performUpkeep(bytes calldata performData) onlyKeeper external override {
+        bytes4 selector = abi.decode(performData, (bytes4));
+    
+        if(selector == this.openRound.selector)
             openRound();
-        else if(lotteryState == LOTTERY_STATE.STARTED && (block.timestamp > roundInfo.timeStarted + roundDuration))
+        else if(selector == this.endRound.selector)
             endRound();
-        else if(lotteryState == LOTTERY_STATE.DRAWING)
+        else if(selector == this.drawNumbers.selector)
             drawNumbers();
     }
 
+    /**
+     * @dev This function updates the keeper address, and only the owner is allowed to invoke it.
+     */
     function setKeeperAddress(address newAddress) external onlyOwner {
         keeperAddress = newAddress;
     }
