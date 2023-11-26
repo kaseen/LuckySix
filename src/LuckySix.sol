@@ -59,7 +59,7 @@ contract LuckySix is
     uint256 public roundDuration;
     Round public roundInfo;
     LOTTERY_STATE public lotteryState;
-    uint256[35] public bonusMultiplier;
+    uint16[35] public bonusMultiplier;
     
     uint256 private lastVerifiedRandomNumber;
     uint256 private ownerBalance;
@@ -79,7 +79,8 @@ contract LuckySix is
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
-        require(_NUMBER_OF_DRAWS + _NUMBER_OF_JOCKERS < _MAXIMUM_NUMBER_DRAWN);
+        require(_NUMBER_OF_DRAWS + _NUMBER_OF_JOCKERS <= 42);
+        require(_MAXIMUM_NUMBER_DRAWN < 64);
         _disableInitializers();
     }
 
@@ -117,19 +118,19 @@ contract LuckySix is
         ];
     }
 
-    function openRound() public onlyKeeper {
+    function openRound() external onlyKeeper {
         if(lotteryState != LOTTERY_STATE.CLOSED) revert LotteryNotClosed();
         lotteryState = LOTTERY_STATE.READY;
         roundInfo.isStarted = false;
         emit GameRoundOpened(roundInfo.numberOfRound);
     }
 
-    function endRound() public onlyKeeper {
+    function endRound() external onlyKeeper {
         if(lotteryState != LOTTERY_STATE.STARTED) revert LotteryNotStarted();
         if(block.timestamp <= roundInfo.timeStarted + roundDuration) revert LotteryNotEnded();
-
         lotteryState = LOTTERY_STATE.CALCULATING;
         lastRequestId = requestRandomNumber();
+        emit GameRequestRandomNumber(lastRequestId);
     }
 
     // =============================================================
@@ -139,7 +140,7 @@ contract LuckySix is
      * @dev A function that plays the ticket of `msg.sender` with a given `combination`, where `msg.value`
      *      must be at least the `platformFee` value.
      */
-    function playTicket(uint8[6] memory combination) public payable {
+    function playTicket(uint8[6] memory combination) external payable {
         if(lotteryState != LOTTERY_STATE.READY && lotteryState != LOTTERY_STATE.STARTED) revert LotteryNotOpen();
         if(!checkIfValid(combination)) revert NotValidCombination(combination);
         if(msg.value <= platformFee) revert NotEnoughFunds(msg.value);
@@ -188,7 +189,7 @@ contract LuckySix is
      *      finally combine the results using bitwise operations to store the outcome
      *      in a single variable. Only keeper address can perform this function.
      */
-    function drawNumbers() public onlyKeeper {
+    function drawNumbers() external onlyKeeper {
         if(lotteryState != LOTTERY_STATE.DRAWING) revert LotteryNotDrawn();
 
         // Variable that will hold a combination of packed drawn numbers and jockers 
@@ -237,9 +238,9 @@ contract LuckySix is
                 j_pos2 /= 2;
         }
 
-        result |= randomNumbers[0] % maximumJockerPosition;
+        result |= j_pos1;
         result <<= 6;
-        result |= randomNumbers[1] % maximumJockerPosition;
+        result |= j_pos2;
     }
 
     /**
@@ -304,7 +305,7 @@ contract LuckySix is
      *      drawn number and the number of jokers. If the platform doesn't have enough funds it awards
      *      everything to the winner.
      */
-    function getPayoutForTicket(uint256 round, uint256 indexOfTicket) public {
+    function getPayoutForTicket(uint256 round, uint256 indexOfTicket) external {
         Ticket[] storage playerTickets = players[msg.sender][round];
 
         if(indexOfTicket >= playerTickets.length) revert InvalidTicket(round, indexOfTicket);
@@ -376,7 +377,6 @@ contract LuckySix is
             callbackGasLimit,
             uint32(1)           // numWords
         );
-        emit GameRequestRandomNumber(requestId);
         return requestId;
     }
 
@@ -433,21 +433,21 @@ contract LuckySix is
         return address(this).balance - ownerBalance;
     }
 
-    function getTicketsForRound(uint256 n) public view returns(Ticket[] memory) {
+    function getTicketsForRound(uint256 n) external view returns(Ticket[] memory) {
         return players[msg.sender][n];
     }
 
-    function withdrawPlatformFee() public payable onlyOwner {
+    function withdrawPlatformFee() external payable onlyOwner {
         platformFee = 0;
         payable(msg.sender).transfer(platformFee);
     }
 
-    function setPlatformFee(uint256 amount) public onlyOwner {
+    function setPlatformFee(uint256 amount) external onlyOwner {
         platformFee = amount;
         emit PlatformFeeChanged(amount);
     }
 
-    function setRoundDuration(uint256 newDuration) public onlyOwner {
+    function setRoundDuration(uint256 newDuration) external onlyOwner {
         roundDuration = newDuration;
     } 
 
