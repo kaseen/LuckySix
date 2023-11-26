@@ -6,6 +6,7 @@ import '@chainlink/automation/AutomationCompatible.sol';
 import '@oz-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 import '@oz-upgradeable/access/OwnableUpgradeable.sol';
 import '@oz-upgradeable/utils/PausableUpgradeable.sol';
+import '@oz-upgradeable/utils/ReentrancyGuardUpgradeable.sol';
 import '@oz/proxy/ERC1967/ERC1967Proxy.sol';
 import './VRFConsumerBaseV2Upgradeable.sol';
 import './interfaces/ILuckySix.sol';
@@ -19,8 +20,9 @@ contract UUPSProxy is ERC1967Proxy {
 contract LuckySix is 
     ILuckySix,
     UUPSUpgradeable,
-    PausableUpgradeable,
     OwnableUpgradeable,
+    PausableUpgradeable,
+    ReentrancyGuardUpgradeable,
     AutomationCompatibleInterface,
     VRFConsumerBaseV2Upgradeable
 {
@@ -95,8 +97,9 @@ contract LuckySix is
     {
         // Constructor for upgradable extensions
         __UUPSUpgradeable_init();
-        __Pausable_init();
         __Ownable_init(msg.sender);
+        __Pausable_init();
+        __ReentrancyGuard_init();
         __VRFConsumerBaseV2Upgradeable_init(vrfCoordinator);
 
         // Constructor body
@@ -305,7 +308,7 @@ contract LuckySix is
      *      drawn number and the number of jokers. If the platform doesn't have enough funds it awards
      *      everything to the winner.
      */
-    function getPayoutForTicket(uint256 round, uint256 indexOfTicket) external {
+    function getPayoutForTicket(uint256 round, uint256 indexOfTicket) external nonReentrant {
         Ticket[] storage playerTickets = players[msg.sender][round];
 
         if(indexOfTicket >= playerTickets.length) revert InvalidTicket(round, indexOfTicket);
@@ -322,7 +325,9 @@ contract LuckySix is
         if(cashEarned > balance)
             cashEarned = balance;
 
-        payable(msg.sender).transfer(cashEarned);
+        (bool sent, ) = msg.sender.call{ value: cashEarned }("");
+        require(sent);
+
         playerTickets[indexOfTicket].redeemed = true;
         
         emit TicketCashedOut(msg.sender, round, indexOfTicket, cashEarned);

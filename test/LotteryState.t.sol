@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import { GameInitForTesting } from './helpers/GameInitForTesting.sol';
 import { LuckySix } from 'src/LuckySix.sol';
 import { ILuckySix } from 'src/interfaces/ILuckySix.sol';
-import { GameInitForTesting } from './helpers/GameInitForTesting.sol';
 import { Test } from 'forge-std/Test.sol';
 
 contract LotteryStateTest is Test, ILuckySix {
