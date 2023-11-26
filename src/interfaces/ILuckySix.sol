@@ -45,4 +45,5 @@ interface ILuckySix {
     error InvalidTicket(uint256, uint256);
     error TicketAlreadyCashed(uint256, uint256);
     error TicketNotWinning(uint256, uint256);
+    error KeeperFailed(bytes4);
 }

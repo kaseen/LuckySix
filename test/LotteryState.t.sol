@@ -24,7 +24,7 @@ contract LotteryStateTest is Test, ILuckySix {
     function test__openRound() public {
         vm.expectEmit(false, false, false, true);
         emit GameRoundOpened(1);
-        setup.keeperPerform(setup.openRoundSelector());
+        setup.keeperCheck();
 
         assertEq(LOTTERY_STATE.READY, game.lotteryState());
     }
@@ -48,7 +48,7 @@ contract LotteryStateTest is Test, ILuckySix {
 
         vm.expectEmit(false, false, false, true, address(game));
         emit GameRequestRandomNumber(0);
-        setup.keeperPerform(setup.endRoundSelector());      
+        setup.keeperCheck();    
         
         assertEq(LOTTERY_STATE.DRAWING, game.lotteryState());
     }
@@ -58,7 +58,7 @@ contract LotteryStateTest is Test, ILuckySix {
         
         vm.expectEmit(false, false, false, true, address(game));
         emit GameRoundEnded(1);
-        setup.keeperPerform(setup.drawNumbersSelector());
+        setup.keeperCheck();
 
         assertEq(LOTTERY_STATE.CLOSED, game.lotteryState());
     }
@@ -68,7 +68,7 @@ contract LotteryStateTest is Test, ILuckySix {
 
         vm.expectEmit(false, false, false, true, address(game));
         emit GameRoundOpened(2);
-        setup.keeperPerform(setup.openRoundSelector());
+        setup.keeperCheck();
 
         assertEq(LOTTERY_STATE.READY, game.lotteryState());
     }

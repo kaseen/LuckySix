@@ -135,7 +135,6 @@ contract LuckySix is
     // =============================================================
     //                        TICKET PLAYING
     // =============================================================
-
     /**
      * @dev A function that plays the ticket of `msg.sender` with a given `combination`, where `msg.value`
      *      must be at least the `platformFee` value.
@@ -184,11 +183,10 @@ contract LuckySix is
     // =============================================================
     //                        DRAWING NUMBERS
     // =============================================================
-
     /**
-     * @dev    Generate random numbers by drawing jokers first, then drawing numbers, and
-     *         finally combine the results using bitwise operations to store the outcome
-     *         in a single variable. Only keeper address can perform this function.
+     * @dev Generate random numbers by drawing jokers first, then drawing numbers, and
+     *      finally combine the results using bitwise operations to store the outcome
+     *      in a single variable. Only keeper address can perform this function.
      */
     function drawNumbers() public onlyKeeper {
         if(lotteryState != LOTTERY_STATE.DRAWING) revert LotteryNotDrawn();
@@ -301,7 +299,6 @@ contract LuckySix is
     // =============================================================
     //                     PAYOUT FOR THE TICKET
     // =============================================================
-
     /**
      * @dev A function that calculates the earnings of a given ticket by finding the index of the last 
      *      drawn number and the number of jokers. If the platform doesn't have enough funds it awards
@@ -416,13 +413,9 @@ contract LuckySix is
      */
     function performUpkeep(bytes calldata performData) onlyKeeper external override {
         bytes4 selector = abi.decode(performData, (bytes4));
-    
-        if(selector == this.openRound.selector)
-            openRound();
-        else if(selector == this.endRound.selector)
-            endRound();
-        else if(selector == this.drawNumbers.selector)
-            drawNumbers();
+
+        (bool success,) = address(this).delegatecall(abi.encodeWithSelector(selector));
+        if(!success) revert KeeperFailed(selector);
     }
 
     /**
