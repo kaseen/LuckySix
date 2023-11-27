@@ -56,6 +56,7 @@ contract ReentracyTest is Test {
     }
 
     function test__ReentracyAttack() public payable {
+        // Expect the contract to revert with `ReentrancyGuardReentrantCall`
         vm.expectRevert();
         game.getPayoutForTicket(0, 0);
     }

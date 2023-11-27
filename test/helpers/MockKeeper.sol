@@ -3,7 +3,11 @@ pragma solidity ^0.8.22;
 
 import { LuckySix } from 'src/LuckySix.sol';
 
-contract MockKeeper {
+interface IMockKeeper {
+    error UpkeepNotNeeded();
+}
+
+contract MockKeeper is IMockKeeper {
 
     LuckySix game;
 
@@ -16,6 +20,8 @@ contract MockKeeper {
         
         if(upkeepNeeded)
             game.performUpkeep(performData);
+        else
+            revert UpkeepNotNeeded();
     }
     
 }

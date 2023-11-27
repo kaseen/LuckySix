@@ -6,7 +6,7 @@ import { LuckySix } from 'src/LuckySix.sol';
 import { ILuckySix } from 'src/interfaces/ILuckySix.sol';
 import { Test } from 'forge-std/Test.sol';
 
-contract TicketTest is Test, ILuckySix {
+contract TicketTest is Test {
 
     GameInitForTesting setup;
     LuckySix game;
@@ -23,14 +23,14 @@ contract TicketTest is Test, ILuckySix {
         uint8[6] memory combination = [1, 2, 3, 4, 5, 49]; 
 
         // Expect `LotteryNotOpen` when lottery has not started
-        vm.expectRevert(abi.encodeWithSelector(LotteryNotOpen.selector));
+        vm.expectRevert(abi.encodeWithSelector(ILuckySix.LotteryNotOpen.selector));
         game.playTicket{ value: ticketBet }(combination);
 
         setup.keeperCheck();
 
         // Expect `NotValidCombination` on invalid combination
         vm.expectRevert(
-            abi.encodeWithSelector(NotValidCombination.selector, combination)
+            abi.encodeWithSelector(ILuckySix.NotValidCombination.selector, combination)
         );
         game.playTicket{ value: ticketBet }(combination);
 
@@ -38,13 +38,13 @@ contract TicketTest is Test, ILuckySix {
         combination[5] = 48;
         uint256 invalidTicketBet = 1 gwei;
         vm.expectRevert(
-            abi.encodeWithSelector(NotEnoughFunds.selector, invalidTicketBet)
+            abi.encodeWithSelector(ILuckySix.NotEnoughFunds.selector, invalidTicketBet)
         );
         game.playTicket{ value: invalidTicketBet }(combination);
 
         // Expect `TicketBought` when everything is correct
         vm.expectEmit(true, false, false, true, address(game));
-        emit TicketBought(address(this), 1, combination);
+        emit ILuckySix.TicketBought(address(this), 1, combination);
         game.playTicket{ value: ticketBet }(combination);
     }
 
@@ -60,40 +60,40 @@ contract TicketTest is Test, ILuckySix {
 
         // Expect `TicketCashedOut` when cashing out valid ticket with WINNING_TICKET_MUTLIPLIER_INDEX
         vm.expectEmit(true, false, false, true, address(game));
-        emit TicketCashedOut(address(setup), ROUND_NUMBER, WINNING_TICKET_INDEX, ticketBet * WINNING_TICKET_MUTLIPLIER_INDEX);
+        emit ILuckySix.TicketCashedOut(address(setup), ROUND_NUMBER, WINNING_TICKET_INDEX, ticketBet * WINNING_TICKET_MUTLIPLIER_INDEX);
         setup.getPayoutForTicket(ROUND_NUMBER, WINNING_TICKET_INDEX);
 
         // Expect `TicketCashedOut` when cashing out ticket with 2 jokers
         vm.expectEmit(true, false, false, true, address(game));
-        emit TicketCashedOut(address(setup), ROUND_NUMBER, WINNING_TICKET_INDEX_WITH_JOKERS, 4 * ticketBet * WINNING_TICKET_MUTLIPLIER_INDEX);
+        emit ILuckySix.TicketCashedOut(address(setup), ROUND_NUMBER, WINNING_TICKET_INDEX_WITH_JOKERS, 4 * ticketBet * WINNING_TICKET_MUTLIPLIER_INDEX);
         setup.getPayoutForTicket(ROUND_NUMBER, WINNING_TICKET_INDEX_WITH_JOKERS);
 
         // Expect `TicketCashedOut` when cashing out ticket with 0 matches
         vm.expectEmit(true, false, false, true, address(game));
-        emit TicketCashedOut(address(setup), ROUND_NUMBER, NO_MATCHES_TICKET_INDEX, ticketBet * 100);
+        emit ILuckySix.TicketCashedOut(address(setup), ROUND_NUMBER, NO_MATCHES_TICKET_INDEX, ticketBet * 100);
         setup.getPayoutForTicket(ROUND_NUMBER, NO_MATCHES_TICKET_INDEX);
 
         // Expect `TicketAlreadyCashed` when double cashing out the same ticket
         vm.expectRevert(
-            abi.encodeWithSelector(TicketAlreadyCashed.selector, ROUND_NUMBER, WINNING_TICKET_INDEX)
+            abi.encodeWithSelector(ILuckySix.TicketAlreadyCashed.selector, ROUND_NUMBER, WINNING_TICKET_INDEX)
         );
         setup.getPayoutForTicket(ROUND_NUMBER, WINNING_TICKET_INDEX);
 
         // Expect `InvalidTicket` when passing invalid round number
         vm.expectRevert(
-            abi.encodeWithSelector(InvalidTicket.selector, invalidRoundNumber, WINNING_TICKET_INDEX)
+            abi.encodeWithSelector(ILuckySix.InvalidTicket.selector, invalidRoundNumber, WINNING_TICKET_INDEX)
         );
         setup.getPayoutForTicket(invalidRoundNumber, WINNING_TICKET_INDEX);
 
         // Expect `InvalidTicket` when passing invalid ticket number
         vm.expectRevert(
-            abi.encodeWithSelector(InvalidTicket.selector, ROUND_NUMBER, invalidTicketNumber)
+            abi.encodeWithSelector(ILuckySix.InvalidTicket.selector, ROUND_NUMBER, invalidTicketNumber)
         );
         setup.getPayoutForTicket(ROUND_NUMBER, invalidTicketNumber);
 
         // Expect `TicketNotWinning` when passing ticket that has not won
         vm.expectRevert(
-            abi.encodeWithSelector(TicketNotWinning.selector, ROUND_NUMBER, LOSING_TICKET_INDEX)
+            abi.encodeWithSelector(ILuckySix.TicketNotWinning.selector, ROUND_NUMBER, LOSING_TICKET_INDEX)
         );
         setup.getPayoutForTicket(ROUND_NUMBER, LOSING_TICKET_INDEX);
     }

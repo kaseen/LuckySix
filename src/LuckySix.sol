@@ -121,6 +121,10 @@ contract LuckySix is
         ];
     }
 
+    /**
+     * @dev A function for a keeper to open a new round whenever the lottery state equals `CLOSED`.
+     *      Note that the lottery countdown begins when the first ticket is played.
+     */
     function openRound() external onlyKeeper {
         if(lotteryState != LOTTERY_STATE.CLOSED) revert LotteryNotClosed();
         lotteryState = LOTTERY_STATE.READY;
@@ -128,6 +132,10 @@ contract LuckySix is
         emit GameRoundOpened(roundInfo.numberOfRound);
     }
 
+    /**
+     * @dev A function that, upon the expiry of the lottery countdown, prevents new tickets from being
+     *      played and sends a new request to Chainlink VRF for a random number.
+     */
     function endRound() external onlyKeeper {
         if(lotteryState != LOTTERY_STATE.STARTED) revert LotteryNotStarted();
         if(block.timestamp <= roundInfo.timeStarted + roundDuration) revert LotteryNotEnded();
@@ -372,7 +380,10 @@ contract LuckySix is
     // =============================================================
     //                         CHAINLINK
     // =============================================================
-
+    /**
+     * @dev This function is a `Chainlink` method that sends a request for a random word and
+     *      returns the ID of the request.
+     */
     function requestRandomNumber() private onlyKeeper returns (uint256 requestId) {
         // Will revert if subscription is not set and funded.
         requestId = COORDINATOR.requestRandomWords(
@@ -385,6 +396,10 @@ contract LuckySix is
         return requestId;
     }
 
+    /**
+     * @dev This function is a `Chainlink` method that serves as a callback when a request is fulfilled.
+     *      It saves the first element from the `randomWords` array as the `lastVerifiedRandomNumber`.
+     */
     function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override {
         require(lotteryState == LOTTERY_STATE.CALCULATING);
         require(lastRequestId == requestId);
@@ -414,9 +429,9 @@ contract LuckySix is
     /**
      * @dev This function is a `Chainlink` method that is executed by the keepers. The data returned
      *      by the checkUpkeep simulation will be passed into this method to be actually executed.
-     *      Only the keeper's address is allowed to call this function.
+     *      Only the keeper's address is allowed to call this function if contract is not paused.
      */
-    function performUpkeep(bytes calldata performData) onlyKeeper external override {
+    function performUpkeep(bytes calldata performData) onlyKeeper whenNotPaused external override {
         bytes4 selector = abi.decode(performData, (bytes4));
 
         (bool success,) = address(this).delegatecall(abi.encodeWithSelector(selector));
@@ -434,14 +449,11 @@ contract LuckySix is
     //                            OTHER
     // =============================================================
 
-    function platformBalance() public view returns (uint256) {
-        return address(this).balance - ownerBalance;
-    }
+    receive() payable external {}
 
-    function getTicketsForRound(uint256 n) external view returns(Ticket[] memory) {
-        return players[msg.sender][n];
-    }
-
+    /**
+     * @dev The functions below are accessible only by the owner.
+     */
     function withdrawPlatformFee() external payable onlyOwner {
         platformFee = 0;
         payable(msg.sender).transfer(platformFee);
@@ -466,5 +478,14 @@ contract LuckySix is
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    receive() payable external {}
+    /**
+     * @dev The functions below provide additional information.
+     */
+    function platformBalance() public view returns (uint256) {
+        return address(this).balance - ownerBalance;
+    }
+
+    function getTicketsForRound(uint256 n) external view returns(Ticket[] memory) {
+        return players[msg.sender][n];
+    }
 }

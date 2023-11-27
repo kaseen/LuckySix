@@ -4,6 +4,7 @@ pragma solidity ^0.8.22;
 import { GameInitForTesting } from './helpers/GameInitForTesting.sol';
 import { LuckySix } from 'src/LuckySix.sol';
 import { ILuckySix } from 'src/interfaces/ILuckySix.sol';
+import { IMockKeeper } from './helpers/MockKeeper.sol';
 import { Test } from 'forge-std/Test.sol';
 
 contract LotteryStateTest is Test, ILuckySix {
@@ -44,12 +45,16 @@ contract LotteryStateTest is Test, ILuckySix {
 
     function test__drawNumbers() public {
         test__startCountdown();
+
+        vm.expectRevert(abi.encodeWithSelector(IMockKeeper.UpkeepNotNeeded.selector));
+        setup.keeperCheck();
+
         skip(game.roundDuration() + 1);
 
         vm.expectEmit(false, false, false, true, address(game));
         emit GameRequestRandomNumber(0);
-        setup.keeperCheck();    
-        
+        setup.keeperCheck();
+
         assertEq(LOTTERY_STATE.DRAWING, game.lotteryState());
     }
 
