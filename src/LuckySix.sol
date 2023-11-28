@@ -2,7 +2,7 @@
 pragma solidity ^0.8.22;
 
 import '@chainlink/interfaces/VRFCoordinatorV2Interface.sol';
-import '@chainlink/automation/AutomationCompatible.sol';
+import '@chainlink/automation/interfaces/AutomationCompatibleInterface.sol';
 import '@oz-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 import '@oz-upgradeable/access/OwnableUpgradeable.sol';
 import '@oz-upgradeable/utils/PausableUpgradeable.sol';
