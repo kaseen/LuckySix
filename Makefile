@@ -12,16 +12,8 @@ install :;
 	forge install Openzeppelin/openzeppelin-contracts --no-commit
 	forge install Openzeppelin/openzeppelin-contracts-upgradeable --no-commit
 
-# Deploy to Sepolia Testnet
-deploy:
-	forge create --rpc-url ${RPC_URL} --private-key ${PRIVATE_KEY} src/LuckySix.sol:LuckySix --constructor-args ${VRF_SUBSCRIPTION_ID} ${VRF_COORDINATOR} ${CHAINLINK_KEEPER}
-
-# Interact with contract deployed on live testnet
-playTicket:
-	cast send ${LUCKY_SIX_PUBLIC_KEY} "playTicket(uint256[6])" "[1,2,3,4,5,6]" --rpc-url ${RPC_URL} --private-key ${PRIVATE_KEY} --value 0.02ether
-getPayoutForTicket:
-	cast send ${LUCKY_SIX_PUBLIC_KEY} "getPayoutForTicket(uint256,uint256)" "5" "0" --rpc-url ${RPC_URL} --private-key ${PRIVATE_KEY}
-getLotteryState:
-	cast call ${LUCKY_SIX_PUBLIC_KEY} "lotteryState()(uint256)" --rpc-url ${RPC_URL} --private-key ${PRIVATE_KEY}
-unpackResultForRound:
-	cast call ${LUCKY_SIX_PUBLIC_KEY} "unpackResultForRound(uint256)(uint256[])" "5" --rpc-url ${RPC_URL} --private-key ${PRIVATE_KEY}
+# Script for deployment on Sepolia/Mumbai Testnet
+deploySepolia:
+	forge script DeployScript --rpc-url ${RPC_SEPOLIA} --private-key ${PRIVATE_KEY} --broadcast
+deployMumbai:
+	forge script DeployScript --rpc-url ${RPC_MUMBAI} --private-key ${PRIVATE_KEY} --broadcast
