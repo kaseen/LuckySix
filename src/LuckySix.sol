@@ -90,8 +90,7 @@ contract LuckySix is
     function initialize (
         address vrfCoordinator,
         bytes32 networkKeyhash,
-        uint64 subscriptionId,
-        address keeperAddr
+        uint64 subscriptionId
     ) 
     external 
     initializer
@@ -107,7 +106,6 @@ contract LuckySix is
         COORDINATOR = VRFCoordinatorV2Interface(vrfCoordinator);
         keyHash = networkKeyhash;
         s_subscriptionId = subscriptionId;
-        forwarderAddress = keeperAddr;      // TODO REMOVE
 
         // Initial contract values
         lotteryState = LOTTERY_STATE.CLOSED;

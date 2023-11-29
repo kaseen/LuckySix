@@ -36,7 +36,7 @@ contract UpgradeableTest is Test {
         gameV1 = LuckySix(payable(address(proxy)));
 
         // Constructor
-        gameV1.initialize(address(this), 0, 0, address(this));
+        gameV1.initialize(address(this), 0, 0);
     }
 
     // Used to measure deployment cost of LuckySix contract
@@ -44,7 +44,7 @@ contract UpgradeableTest is Test {
         LuckySix implementation = new LuckySix();
         UUPSProxy uups = new UUPSProxy(address(implementation), "");
         LuckySix game = LuckySix(payable(address(uups)));
-        game.initialize(address(this), 0, 0, address(this));
+        game.initialize(address(this), 0, 0);
     }
 
     function test__Upgrade() public {

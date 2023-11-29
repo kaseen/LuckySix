@@ -31,7 +31,8 @@ contract ReentracyTest is Test {
         proxy = new UUPSProxy(address(implementation), "");
         game = LuckySix(payable(address(proxy)));
         payable(address(game)).transfer(50 ether);
-        game.initialize(address(mockVrfCoordinator), 0, 0, address(mockKeeper));
+        game.initialize(address(mockVrfCoordinator), 0, 0);
+        game.setKeeperAddress(address(mockKeeper));
 
         // Initialize game
         mockKeeper.setLuckySixAddress(address(game));

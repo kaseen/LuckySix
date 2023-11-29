@@ -10,7 +10,6 @@ contract DeployScript is Script {
     address immutable LINK_TOKEN;
     bytes32 immutable KEYHASH;
     uint64 immutable SUBSCRIPTION_ID;
-    address immutable KEEPER_ADDRESS;
 
     VRFCoordinatorV2Interface immutable COORDINATOR;
     uint256 immutable PRIVATE_KEY;
@@ -24,7 +23,6 @@ contract DeployScript is Script {
             COORDINATOR_ADDRESS = 0x8103B0A8A00be2DDC778e6e7eaa21791Cd364625;
             KEYHASH = 0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c;
             SUBSCRIPTION_ID = 1508;
-            KEEPER_ADDRESS = 0xb0E49c5D0d05cbc241d68c05BC5BA1d1B7B72976;
             LINK_TOKEN = 0x779877A7B0D9E8603169DdbD7836e478b4624789;
         }
         // For Mumbai testnet
@@ -32,7 +30,6 @@ contract DeployScript is Script {
             COORDINATOR_ADDRESS = 0x7a1BaC17Ccc5b313516C5E16fb24f7659aA5ebed;
             KEYHASH = 0x4b09e658ed251bcafeebbc69400383d49f344ace09b9576fe248bb02c003fe9f;
             SUBSCRIPTION_ID = 6579;
-            KEEPER_ADDRESS = 0xf97C091179A4A4d666da7a2764dDeD4F932FC14A;
             LINK_TOKEN = 0x326C977E6efc84E512bB9C30f76E30c160eD06FB;
         }
         else
@@ -43,23 +40,50 @@ contract DeployScript is Script {
     }
 
     function run() external {
-
         vm.startBroadcast(PRIVATE_KEY);
 
+        address lotteryAddress = deployLottery();
+        addVrfConsumer(lotteryAddress);
+
+        //addForwarder(0x5E6ee5534b4C7081E852788b1a8781EDFA1b35e5, 0xD0E80E2ceDCF8c8953358e5E3A9EBc873aB3A848);
+
+        vm.stopBroadcast();
+    }
+
+    /**
+     * @dev This function deploys the implementation code, wraps it in a proxy, initializes the game,
+     *      and returns the address of lottery.
+     */
+    function deployLottery() private returns (address) {
         LuckySix implementation = new LuckySix();
         UUPSProxy proxy = new UUPSProxy(address(implementation), "");
         LuckySix game = LuckySix(payable(address(proxy)));
-        game.initialize(COORDINATOR_ADDRESS, KEYHASH, SUBSCRIPTION_ID, KEEPER_ADDRESS);
+        game.initialize(COORDINATOR_ADDRESS, KEYHASH, SUBSCRIPTION_ID);
+        return address(game);
+    }
 
-        COORDINATOR.addConsumer(SUBSCRIPTION_ID, address(game));
+    /**
+     * @dev This function adds a new consumer to the VRF subscription.
+     */
+    function addVrfConsumer(address lotteryAddress) private {
+        COORDINATOR.addConsumer(SUBSCRIPTION_ID, lotteryAddress);
+    }
 
-        vm.stopBroadcast();
+    /**
+     * @dev After the registration of upkeep, a unique `forwarder` address is created for permissioned
+     *      access to the `performUpkeep` function.
+     */
+    function addForwarder(address lotteryAddress, address forwarderAddress) private {
+        LuckySix game = LuckySix(payable(lotteryAddress));
+        game.setKeeperAddress(forwarderAddress);
+    }
 
-        /*
-        vm.startBroadcast(PRIVATE_KEY);
-        LuckySix game = LuckySix(payable(0xAaa14C6064b2649cf6D6af5C99df3EEe26FE7344));
-        game.setKeeperAddress(0xB3335686967A9B4e492d4b5A0b1e7Dfc0F9F41F1);
-        vm.stopBroadcast();
-        */
+    /**
+     * @dev Remove all consumers from a VRF subscription with the given `subId`.
+     */
+    function clearAllConsumersVRF() private {
+        (,,,address[] memory consumers) = COORDINATOR.getSubscription(SUBSCRIPTION_ID);
+        for(uint i; i<consumers.length; i++)
+            COORDINATOR.removeConsumer(SUBSCRIPTION_ID, consumers[i]);
     }
 }
