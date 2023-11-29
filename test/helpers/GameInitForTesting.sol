@@ -36,7 +36,7 @@ contract GameInitForTesting is Test {
 
         payable(address(game)).transfer(balance);
 
-        game.initialize(0, address(mockVrfCoordinator), address(mockKeeper));
+        game.initialize(address(mockVrfCoordinator), 0, 0, address(mockKeeper));
     }
 
     function initGame() public {

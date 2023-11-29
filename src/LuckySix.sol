@@ -72,10 +72,10 @@ contract LuckySix is
     uint256 private lastRequestId;
     bytes32 private keyHash;
     uint32 private callbackGasLimit;
-    address private keeperAddress;
+    address private forwarderAddress;
 
     modifier onlyKeeper {
-        if(msg.sender != keeperAddress) revert UnauthorizedAccess();
+        if(msg.sender != forwarderAddress) revert UnauthorizedAccess();
         _;
     }
 
@@ -88,11 +88,12 @@ contract LuckySix is
 
     // Constructor
     function initialize (
-        uint64 subscriptionId,
         address vrfCoordinator,
+        bytes32 networkKeyhash,
+        uint64 subscriptionId,
         address keeperAddr
     ) 
-    public 
+    external 
     initializer
     {
         // Constructor for upgradable extensions
@@ -104,12 +105,12 @@ contract LuckySix is
 
         // Constructor body
         COORDINATOR = VRFCoordinatorV2Interface(vrfCoordinator);
+        keyHash = networkKeyhash;
         s_subscriptionId = subscriptionId;
-        keeperAddress = keeperAddr;
-        lotteryState = LOTTERY_STATE.CLOSED;
+        forwarderAddress = keeperAddr;      // TODO REMOVE
 
         // Initial contract values
-        keyHash = 0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c;
+        lotteryState = LOTTERY_STATE.CLOSED;
         callbackGasLimit = 100000;
         roundDuration = 600;
         platformFee = 0.01 ether;
@@ -442,7 +443,7 @@ contract LuckySix is
      * @dev This function updates the keeper address, and only the owner is allowed to invoke it.
      */
     function setKeeperAddress(address newAddress) external onlyOwner {
-        keeperAddress = newAddress;
+        forwarderAddress = newAddress;
     }
 
     // =============================================================
@@ -468,11 +469,11 @@ contract LuckySix is
         roundDuration = newDuration;
     } 
 
-    function pause() public onlyOwner {
+    function pause() external onlyOwner {
         _pause();
     }
 
-    function unpause() public onlyOwner {
+    function unpause() external onlyOwner {
         _unpause();
     }
 
