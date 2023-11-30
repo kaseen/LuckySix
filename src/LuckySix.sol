@@ -86,7 +86,10 @@ contract LuckySix is
         _disableInitializers();
     }
 
-    // Constructor
+    /**
+     * @dev A function for an upgradeable contract where the constructor logic, along with initial
+     *      contract values, is implemented.
+     */
     function initialize (
         address vrfCoordinator,
         bytes32 networkKeyhash,
@@ -447,44 +450,65 @@ contract LuckySix is
     // =============================================================
     //                            OTHER
     // =============================================================
-
+    /**
+     * @dev A fallback function.
+     */
     receive() payable external {}
 
     /**
-     * @dev The functions below are accessible only by the owner.
+     * @dev The function allows the owner to withdraw the fees of users.
      */
     function withdrawPlatformFee() external payable onlyOwner {
         platformFee = 0;
         payable(msg.sender).transfer(platformFee);
     }
 
+    /**
+     * @dev The function allows the owner to change the `platformFee`.
+     */
     function setPlatformFee(uint256 amount) external onlyOwner {
         platformFee = amount;
         emit PlatformFeeChanged(amount);
     }
 
+    /**
+     * @dev The function allows the owner to change the `roundDuration`.
+     */
     function setRoundDuration(uint256 newDuration) external onlyOwner {
         roundDuration = newDuration;
     } 
 
+    /**
+     * @dev The function pauses the lottery, and the keeper cannot call the `performUpkeep` function.
+     */
     function pause() external onlyOwner {
         _pause();
     }
 
+    /**
+     * @dev The function unpauses the lottery, allowing the keeper to call the `performUpkeep` function.
+     */
     function unpause() external onlyOwner {
         _unpause();
     }
 
+    /**
+     * @dev This function upgrades the implementation code of the proxy to the implementation code of the
+     *      `newImplementation` address.
+     */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     /**
-     * @dev The functions below provide additional information.
+     * @dev The function provides the balance of the platform.
      */
     function platformBalance() public view returns (uint256) {
         return address(this).balance - ownerBalance;
     }
 
-    function getTicketsForRound(uint256 n) external view returns(Ticket[] memory) {
-        return players[msg.sender][n];
+    /**
+     * @dev The function returns all tickets played in a round for `msg.sender`.
+     */
+    function getTicketsForRound(uint256 round) external view returns (Ticket[] memory) {
+        return players[msg.sender][round];
     }
 }

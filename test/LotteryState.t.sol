@@ -7,11 +7,13 @@ import { ILuckySix } from 'src/interfaces/ILuckySix.sol';
 import { IMockKeeper } from './helpers/MockKeeper.sol';
 import { Test } from 'forge-std/Test.sol';
 
-contract LotteryStateTest is Test, ILuckySix {
+contract LotteryStateTest is Test {
 
     GameInitForTesting setup;
     LuckySix game;
     uint256 ticketBet = 1 ether;
+
+    enum LOTTERY_STATE { READY, STARTED, CALCULATING, DRAWING, CLOSED }
 
     function setUp() public {
         setup = (new GameInitForTesting){ value: 100 ether }();
@@ -24,10 +26,10 @@ contract LotteryStateTest is Test, ILuckySix {
 
     function test__openRound() public {
         vm.expectEmit(false, false, false, true);
-        emit GameRoundOpened(1);
+        emit ILuckySix.GameRoundOpened(1);
         setup.keeperCheck();
 
-        assertEq(LOTTERY_STATE.READY, game.lotteryState());
+        assertEq(uint256(LOTTERY_STATE.READY), uint256(game.lotteryState()));
     }
 
     function test__startCountdown() public {
@@ -36,11 +38,11 @@ contract LotteryStateTest is Test, ILuckySix {
         uint8[6] memory losingCombination = [3, 4, 5, 8, 9, 14];
 
         vm.expectEmit(false, false, false, true, address(game));
-        emit GameStarted(1);
+        emit ILuckySix.GameStarted(1);
         game.playTicket{ value: ticketBet }(winningCombination);
         game.playTicket{ value: ticketBet }(losingCombination);
 
-        assertEq(LOTTERY_STATE.STARTED, game.lotteryState());
+        assertEq(uint256(LOTTERY_STATE.STARTED), uint256(game.lotteryState()));
     }
 
     function test__drawNumbers() public {
@@ -52,30 +54,30 @@ contract LotteryStateTest is Test, ILuckySix {
         skip(game.roundDuration() + 1);
 
         vm.expectEmit(false, false, false, true, address(game));
-        emit GameRequestRandomNumber(0);
+        emit ILuckySix.GameRequestRandomNumber(0);
         setup.keeperCheck();
 
-        assertEq(LOTTERY_STATE.DRAWING, game.lotteryState());
+        assertEq(uint256(LOTTERY_STATE.DRAWING), uint256(game.lotteryState()));
     }
 
     function test__endRound() public {
         test__drawNumbers();
         
         vm.expectEmit(false, false, false, true, address(game));
-        emit GameRoundEnded(1);
+        emit ILuckySix.GameRoundEnded(1);
         setup.keeperCheck();
 
-        assertEq(LOTTERY_STATE.CLOSED, game.lotteryState());
+        assertEq(uint256(LOTTERY_STATE.CLOSED), uint256(game.lotteryState()));
     }
 
     function test__openRound2() public {
         test__endRound();
 
         vm.expectEmit(false, false, false, true, address(game));
-        emit GameRoundOpened(2);
+        emit ILuckySix.GameRoundOpened(2);
         setup.keeperCheck();
 
-        assertEq(LOTTERY_STATE.READY, game.lotteryState());
+        assertEq(uint256(LOTTERY_STATE.READY), uint256(game.lotteryState()));
     }
 
 }
