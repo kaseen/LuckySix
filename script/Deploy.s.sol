@@ -1,8 +1,8 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.19;
 
 import { LuckySix, UUPSProxy } from 'src/LuckySix.sol';
-import { AutomationRegistrarInterface, RegistrationParams } from './AutomationRegistrarInterface.sol';
+import { AutomationRegistrarInterface, RegistrationParams } from './interfaces/AutomationRegistrarInterface.sol';
 import '@chainlink/automation/interfaces/v2_1/IKeeperRegistryMaster.sol';
 import '@chainlink/interfaces/VRFCoordinatorV2Interface.sol';
 import '@chainlink/shared/interfaces/LinkTokenInterface.sol';
@@ -62,12 +62,20 @@ contract DeployScript is Script {
     function run() external {
         vm.startBroadcast(PRIVATE_KEY);
 
-        address lotteryAddress = deployLottery();
+       /* address lotteryAddress = deployLottery();
         addVrfConsumer(lotteryAddress);
 
         uint256 keeperId = addKeeper(lotteryAddress, msg.sender, 5 * 10 ** 18);
-        addForwarder(lotteryAddress, keeperId);
+        addForwarder(lotteryAddress, keeperId);*/
 
+        
+        LuckySix game = LuckySix(payable(0x86E074017b01541fcb8CB548Cbd61d9fF9D23a9a));
+        console.log("BLA %s", uint256(game.lotteryState()));
+        /*uint256[] memory tmp = game.unpackResultForRound(0);
+        for(uint i; i<35; i++)
+            console.log(tmp[i]);*/
+        //game.playTicket{ value: 0.02 ether }([1,2,3,4,5,6]);
+        
         vm.stopBroadcast();
     }
 

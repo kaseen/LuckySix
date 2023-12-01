@@ -1,4 +1,20 @@
-// SPDX-License-Identifier: MIT
+/**
+ * Copyright (c) 2023 Vukašin Tasić
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.22;
 
 import '@chainlink/interfaces/VRFCoordinatorV2Interface.sol';
@@ -8,7 +24,7 @@ import '@oz-upgradeable/access/OwnableUpgradeable.sol';
 import '@oz-upgradeable/utils/PausableUpgradeable.sol';
 import '@oz-upgradeable/utils/ReentrancyGuardUpgradeable.sol';
 import '@oz/proxy/ERC1967/ERC1967Proxy.sol';
-import './VRFConsumerBaseV2Upgradeable.sol';
+import './extensions/VRFConsumerBaseV2Upgradeable.sol';
 import './interfaces/ILuckySix.sol';
 
 contract UUPSProxy is ERC1967Proxy {
@@ -155,7 +171,7 @@ contract LuckySix is
      */
     function playTicket(uint8[6] memory combination) external payable {
         if(lotteryState != LOTTERY_STATE.READY && lotteryState != LOTTERY_STATE.STARTED) revert LotteryNotOpen();
-        if(!checkIfValid(combination)) revert NotValidCombination(combination);
+        if(!_checkIfValid(combination)) revert NotValidCombination(combination);
         if(msg.value <= platformFee) revert NotEnoughFunds(msg.value);
 
         // If there are no tickets played before this one in the current round, initiate the game countdown
@@ -180,7 +196,7 @@ contract LuckySix is
     /**
      * @dev A function that verifies whether the given `combination` contains valid and unique numbers.
      */
-    function checkIfValid(uint8[6] memory combination) private pure returns (bool) {
+    function _checkIfValid(uint8[6] memory combination) private pure returns (bool) {
         for(uint256 i; i < combination.length; ++i) {
             // Check if number is between 1 and `_MAXIMUM_NUMBER_DRAWN`
             if(combination[i] < 1 || combination[i] > _MAXIMUM_NUMBER_DRAWN)
@@ -208,10 +224,10 @@ contract LuckySix is
         // Variable that will hold a combination of packed drawn numbers and jockers 
         uint256 drawnNumbersAndJokers;
 
-        uint256[] memory randomNumbers = generateRandomNumbers();
+        uint256[] memory randomNumbers = _generateRandomNumbers();
 
-        drawnNumbersAndJokers = drawAndPackJockers(randomNumbers) << _BITPOS_JOCKERS;
-        drawnNumbersAndJokers |= drawAndPackNumbers(randomNumbers);
+        drawnNumbersAndJokers = _drawAndPackJockers(randomNumbers) << _BITPOS_JOCKERS;
+        drawnNumbersAndJokers |= _drawAndPackNumbers(randomNumbers);
 
         packedJokersAndNumbersForRound[roundInfo.numberOfRound] = drawnNumbersAndJokers;
 
@@ -224,7 +240,7 @@ contract LuckySix is
      *      drawn from `lastVerifiedRandomNumber` to determine absolutely random positions
      *      for both jokers and regular numbers.
      */
-    function generateRandomNumbers() private view returns (uint256[] memory) {
+    function _generateRandomNumbers() private view returns (uint256[] memory) {
         uint256[] memory randomNumbers = new uint256[](_NUMBER_OF_DRAWS + _NUMBER_OF_JOCKERS);
         for (uint256 i; i < _NUMBER_OF_DRAWS + _NUMBER_OF_JOCKERS; ++i)
             randomNumbers[i] = uint256(keccak256(abi.encode(block.timestamp, lastVerifiedRandomNumber, i)));
@@ -236,7 +252,7 @@ contract LuckySix is
      *      as a winning combination is not possible in the initial 5 draws. Furthermore,
      *      it addresses the scenario where the joker positions have the same value.
      */
-    function drawAndPackJockers(uint256[] memory randomNumbers) private pure returns (uint256 result) {
+    function _drawAndPackJockers(uint256[] memory randomNumbers) private pure returns (uint256 result) {
         uint256 maximumJockerPosition = _NUMBER_OF_DRAWS - 5;
 
         uint256 j_pos1 = randomNumbers[0] % maximumJockerPosition;
@@ -260,7 +276,7 @@ contract LuckySix is
      * @dev Numbers are drawn independently of jokers, and the most recently drawn number is
      *      located in the lowest bit of the `packedJokersAndNumbersForRound` map.
      */
-    function drawAndPackNumbers(uint256[] memory randomNumbers) private pure returns (uint256 result) {
+    function _drawAndPackNumbers(uint256[] memory randomNumbers) private pure returns (uint256 result) {
         // Create a sequence of numbers from 1 to `_MAXIMUM_NUMBER_DRAWN`
         uint256[_MAXIMUM_NUMBER_DRAWN] memory allNumbers;
         for(uint256 i; i < _MAXIMUM_NUMBER_DRAWN; ++i)
@@ -325,7 +341,7 @@ contract LuckySix is
         if(playerTickets[indexOfTicket].redeemed) revert TicketAlreadyCashed(round, indexOfTicket);
 
         // Determine the multiplier for the last drawn number
-        uint256 multiplier = getMultiplier(round, playerTickets[indexOfTicket].combination);
+        uint256 multiplier = _getMultiplier(round, playerTickets[indexOfTicket].combination);
 
         if(multiplier == 0) revert TicketNotWinning(round, indexOfTicket);
         uint256 cashEarned = multiplier * playerTickets[indexOfTicket].bet;
@@ -348,7 +364,7 @@ contract LuckySix is
      *      the ticket against the drawn numbers, while also checking if the drawn number shares the
      *      same index as any of the joker positions.
      */
-    function getMultiplier(uint256 round, uint8[6] memory ticketNumbers) private view returns (uint256) {
+    function _getMultiplier(uint256 round, uint8[6] memory ticketNumbers) private view returns (uint256) {
         (uint256 j_pos1, uint256 j_pos2) = unpackJockersForRound(round);
         uint256 jockersCounter;
 
