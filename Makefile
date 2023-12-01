@@ -12,6 +12,10 @@ install :;
 	forge install Openzeppelin/openzeppelin-contracts --no-commit
 	forge install Openzeppelin/openzeppelin-contracts-upgradeable --no-commit
 
+# Script for generating the ABI of the contract and saving it as `abi.json` in the root directory.
+getABI:
+	forge build --silent && jq '.abi' ./out/LuckySix.sol/LuckySix.json >> abi.json
+
 # Script for deployment on Sepolia/Mumbai Testnet
 deploySepolia:
 	forge script DeployScript --rpc-url ${RPC_SEPOLIA} --private-key ${PRIVATE_KEY} --broadcast
