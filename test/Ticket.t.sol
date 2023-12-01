@@ -2,8 +2,7 @@
 pragma solidity ^0.8.22;
 
 import { GameInitForTesting } from './helpers/GameInitForTesting.sol';
-import { LuckySix } from 'src/LuckySix.sol';
-import { ILuckySix } from 'src/interfaces/ILuckySix.sol';
+import { LuckySix, ILuckySix } from 'src/LuckySix.sol';
 import { Test } from 'forge-std/Test.sol';
 
 contract TicketTest is Test {
@@ -14,7 +13,7 @@ contract TicketTest is Test {
 
     function setUp() public {
         setup = (new GameInitForTesting){ value: 100 ether }();
-        game = LuckySix(setup.game());
+        game = setup.game();
 
         ticketBet = setup.ticketBet() - game.platformFee();
     }
@@ -49,23 +48,23 @@ contract TicketTest is Test {
     }
 
     function test__getPayoutForTicket() public {
-        uint256 ROUND_NUMBER = 0;
-        uint256 WINNING_TICKET_INDEX = 0;
+        uint256 ROUND_NUMBER = setup.SETUP_ROUND_NUMBER();
+        uint256 WINNING_TICKET_INDEX = setup.WINNING_TICKET_INDEX();
         uint256 WINNING_TICKET_INDEX_WITH_JOKERS = 1;
         uint256 NO_MATCHES_TICKET_INDEX = 2;
         uint256 LOSING_TICKET_INDEX = 3;
-        uint256 WINNING_TICKET_MUTLIPLIER_INDEX = 6;
+        uint256 WINNING_TICKET_MUTLIPLIER = setup.WINNING_TICKET_MUTLIPLIER();
         uint256 invalidRoundNumber = 10000;
         uint256 invalidTicketNumber = 10000;
 
         // Expect `TicketCashedOut` when cashing out valid ticket with WINNING_TICKET_MUTLIPLIER_INDEX
         vm.expectEmit(true, false, false, true, address(game));
-        emit ILuckySix.TicketCashedOut(address(setup), ROUND_NUMBER, WINNING_TICKET_INDEX, ticketBet * WINNING_TICKET_MUTLIPLIER_INDEX);
+        emit ILuckySix.TicketCashedOut(address(setup), ROUND_NUMBER, WINNING_TICKET_INDEX, ticketBet * WINNING_TICKET_MUTLIPLIER);
         setup.getPayoutForTicket(ROUND_NUMBER, WINNING_TICKET_INDEX);
 
         // Expect `TicketCashedOut` when cashing out ticket with 2 jokers
         vm.expectEmit(true, false, false, true, address(game));
-        emit ILuckySix.TicketCashedOut(address(setup), ROUND_NUMBER, WINNING_TICKET_INDEX_WITH_JOKERS, 4 * ticketBet * WINNING_TICKET_MUTLIPLIER_INDEX);
+        emit ILuckySix.TicketCashedOut(address(setup), ROUND_NUMBER, WINNING_TICKET_INDEX_WITH_JOKERS, 4 * ticketBet * WINNING_TICKET_MUTLIPLIER);
         setup.getPayoutForTicket(ROUND_NUMBER, WINNING_TICKET_INDEX_WITH_JOKERS);
 
         // Expect `TicketCashedOut` when cashing out ticket with 0 matches

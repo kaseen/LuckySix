@@ -16,7 +16,7 @@ contract OwnablePausableTest is Test {
 
     function setUp() public {
         setup = (new GameInitForTesting){ value: 100 ether }();
-        game = LuckySix(setup.game());
+        game = setup.game();
     }
 
     function test__Ownable() public {

@@ -3,9 +3,9 @@ pragma solidity ^0.8.22;
 
 import { MockVRFCoordinator } from './helpers/MockVRFCoordinator.sol';
 import { MockKeeper } from './helpers/MockKeeper.sol';
-
+import { ERC1967Proxy } from '@oz/proxy/ERC1967/ERC1967Proxy.sol';
 import { GameInitForTesting } from './helpers/GameInitForTesting.sol';
-import { LuckySix, UUPSProxy } from 'src/LuckySix.sol';
+import { LuckySix } from 'src/LuckySix.sol';
 import { Test } from 'forge-std/Test.sol';
 
 contract ReentracyTest is Test {
@@ -14,7 +14,7 @@ contract ReentracyTest is Test {
     MockKeeper immutable mockKeeper;
 
     LuckySix implementation;
-    UUPSProxy proxy;
+    ERC1967Proxy proxy;
     LuckySix public game;
 
     uint256 public ticketBet = 0.1 ether;
@@ -28,7 +28,7 @@ contract ReentracyTest is Test {
     function setUp() public {
         // Deploy
         implementation = new LuckySix();
-        proxy = new UUPSProxy(address(implementation), "");
+        proxy = new ERC1967Proxy(address(implementation), "");
         game = LuckySix(payable(address(proxy)));
         payable(address(game)).transfer(50 ether);
         game.initialize(address(mockVrfCoordinator), 0, 0);

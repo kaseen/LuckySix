@@ -27,12 +27,6 @@ import '@oz/proxy/ERC1967/ERC1967Proxy.sol';
 import './extensions/VRFConsumerBaseV2Upgradeable.sol';
 import './interfaces/ILuckySix.sol';
 
-contract UUPSProxy is ERC1967Proxy {
-    constructor(address _implementation, bytes memory _data)
-        ERC1967Proxy(_implementation, _data)
-    {}
-}
-
 contract LuckySix is 
     ILuckySix,
     UUPSUpgradeable,
