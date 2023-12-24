@@ -14,7 +14,7 @@ contract LocalDeployGameScript is Script {
     uint256 private constant PRIVATE_KEY =
         0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6; // Index 0
 
-    uint256 private constant LOCAL_ID = 31337;
+    uint256 private constant LOCAL_ID = 1337;
 
     function run() external {
         if(block.chainid != LOCAL_ID){
