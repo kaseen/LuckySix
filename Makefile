@@ -51,7 +51,7 @@ playTicket:
 	elif [ "$(network)" = "mumbai" ]; then \
 		cast send ${LUCKY_SIX_MUMBAI} "playTicket(uint8[6])" $(combination) --rpc-url ${RPC_MUMBAI} --private-key ${PRIVATE_KEY} --value 0.02ether; \
 	elif [ "$(network)" = "local" ]; then \
-		cast send $(LOCAL_GAME_ADDRESS) "playTicket(uint8[6])" $(combination) --rpc-url $(LOCAL_RPC) --private-key $(LOCAL_PRIVATE_KEY_USER) --value 0.12ether; \
+		cast send $(LOCAL_GAME_ADDRESS) "playTicket(uint8[6])" $(combination) --rpc-url $(LOCAL_RPC) --private-key $(LOCAL_PRIVATE_KEY_USER) --value $(value)ether; \
 	else \
 		echo "Correct input: make playTicket network=<network> combination=<[]>"; \
 		echo "Networks available: sepolia, mumbai, local."; \
@@ -65,17 +65,17 @@ checkUpkeep:
 initializeLocalLotteryForTesting:
 	anvil --chain-id 1337 & \
 	make deploy network=local; \
-	make playTicket network=local combination=[1,2,3,4,5,6]; \
-	make playTicket network=local combination=[10,15,20,25,30,35]; \
-	make playTicket network=local combination=[13,23,37,40,41,42]; \
-	make playTicket network=local combination=[1,22,33,14,15,36]; \
-	make playTicket network=local combination=[1,6,18,28,30,31]; \
-	make playTicket network=local combination=[12,23,34,45,15,16]; \
-	make playTicket network=local combination=[7,8,19,21,37,40]; \
-	make playTicket network=local combination=[6,9,16,23,34,38]; \
-	make playTicket network=local combination=[10,11,12,14,15,16]; \
-	make playTicket network=local combination=[13,15,37,44,24,25]; \
-	make playTicket network=local combination=[13,17,29,31,32,33]; \
+	make playTicket network=local combination=[1,2,3,4,5,6] value=0.02; \
+	make playTicket network=local combination=[10,15,20,25,30,35] value=0.0123; \
+	make playTicket network=local combination=[13,23,37,40,41,42] value=0.5; \
+	make playTicket network=local combination=[1,22,33,14,15,36] value=0.41; \
+	make playTicket network=local combination=[1,6,18,28,30,31] value=1; \
+	make playTicket network=local combination=[12,23,34,45,15,16] value=0.42; \
+	make playTicket network=local combination=[7,8,19,21,37,40] value=0.03; \
+	make playTicket network=local combination=[6,9,16,23,34,38] value=0.03; \
+	make playTicket network=local combination=[5,10,15,23,34,38] value=0.03; \
+	make playTicket network=local combination=[13,15,37,44,24,25] value=0.021; \
+	make playTicket network=local combination=[13,17,29,31,32,33] value=0.045; \
 	make checkUpkeep; \
 	make checkUpkeep; \
 	make checkUpkeep

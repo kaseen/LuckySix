@@ -469,8 +469,8 @@ contract LuckySix is
      * @dev The function allows the owner to withdraw the fees of users.
      */
     function withdrawPlatformFee() external payable onlyOwner {
-        platformFee = 0;
-        payable(msg.sender).transfer(platformFee);
+        payable(msg.sender).transfer(ownerBalance);
+        ownerBalance = 0;
     }
 
     /**
